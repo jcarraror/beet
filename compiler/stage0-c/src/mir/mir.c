@@ -71,6 +71,8 @@ int beet_mir_add_const_int(beet_mir_function *function, int value) {
   instr = &function->instrs[function->instr_count];
   instr->op = BEET_MIR_OP_CONST_INT;
   instr->dst = temp;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
   instr->int_value = value;
   instr->name[0] = '\0';
 
@@ -96,6 +98,8 @@ int beet_mir_add_bind_local(beet_mir_function *function, const char *name,
   instr = &function->instrs[function->instr_count];
   instr->op = BEET_MIR_OP_BIND_LOCAL;
   instr->dst = src_temp;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
   instr->int_value = 0;
   beet_copy_name(instr->name, name, name_len);
 
@@ -103,6 +107,64 @@ int beet_mir_add_bind_local(beet_mir_function *function, const char *name,
   function->local_count += 1U;
   function->instr_count += 1U;
   return 1;
+}
+
+int beet_mir_add_load_local(beet_mir_function *function, const char *name,
+                            size_t name_len) {
+  beet_mir_instr *instr;
+  int temp;
+
+  assert(function != NULL);
+  assert(name != NULL);
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return -1;
+  }
+
+  temp = function->next_temp;
+  function->next_temp += 1;
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = BEET_MIR_OP_LOAD_LOCAL;
+  instr->dst = temp;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
+  instr->int_value = 0;
+  beet_copy_name(instr->name, name, name_len);
+
+  function->instr_count += 1U;
+  return temp;
+}
+
+int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
+                            int lhs_temp, int rhs_temp) {
+  beet_mir_instr *instr;
+  int temp;
+
+  assert(function != NULL);
+
+  if (op != BEET_MIR_OP_ADD_INT && op != BEET_MIR_OP_SUB_INT &&
+      op != BEET_MIR_OP_MUL_INT && op != BEET_MIR_OP_DIV_INT) {
+    return -1;
+  }
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return -1;
+  }
+
+  temp = function->next_temp;
+  function->next_temp += 1;
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = op;
+  instr->dst = temp;
+  instr->src_lhs = lhs_temp;
+  instr->src_rhs = rhs_temp;
+  instr->int_value = 0;
+  instr->name[0] = '\0';
+
+  function->instr_count += 1U;
+  return temp;
 }
 
 int beet_mir_add_return_local(beet_mir_function *function, const char *name,
@@ -119,8 +181,31 @@ int beet_mir_add_return_local(beet_mir_function *function, const char *name,
   instr = &function->instrs[function->instr_count];
   instr->op = BEET_MIR_OP_RETURN_LOCAL;
   instr->dst = -1;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
   instr->int_value = 0;
   beet_copy_name(instr->name, name, name_len);
+
+  function->instr_count += 1U;
+  return 1;
+}
+
+int beet_mir_add_return_temp(beet_mir_function *function, int temp) {
+  beet_mir_instr *instr;
+
+  assert(function != NULL);
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return 0;
+  }
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = BEET_MIR_OP_RETURN_TEMP;
+  instr->dst = temp;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
+  instr->int_value = 0;
+  instr->name[0] = '\0';
 
   function->instr_count += 1U;
   return 1;
@@ -138,6 +223,8 @@ int beet_mir_add_return_const_int(beet_mir_function *function, int value) {
   instr = &function->instrs[function->instr_count];
   instr->op = BEET_MIR_OP_RETURN_CONST_INT;
   instr->dst = -1;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
   instr->int_value = value;
   instr->name[0] = '\0';
 
@@ -170,9 +257,96 @@ int beet_mir_lower_binding(beet_mir_function *function,
   return 1;
 }
 
+static int beet_mir_lower_expr(beet_mir_function *function,
+                               const beet_ast_expr *expr, int *out_temp) {
+  int lhs_temp;
+  int rhs_temp;
+
+  assert(function != NULL);
+  assert(expr != NULL);
+  assert(out_temp != NULL);
+
+  switch (expr->kind) {
+  case BEET_AST_EXPR_INT_LITERAL:
+    if (!beet_parse_int_slice(expr->text, expr->text_len, &lhs_temp)) {
+      return 0;
+    }
+
+    *out_temp = beet_mir_add_const_int(function, lhs_temp);
+    return *out_temp >= 0;
+
+  case BEET_AST_EXPR_NAME:
+    *out_temp = beet_mir_add_load_local(function, expr->text, expr->text_len);
+    return *out_temp >= 0;
+
+  case BEET_AST_EXPR_UNARY: {
+    int zero_temp;
+
+    if (expr->unary_op != BEET_AST_UNARY_NEGATE || expr->left == NULL) {
+      return 0;
+    }
+
+    zero_temp = beet_mir_add_const_int(function, 0);
+    if (zero_temp < 0) {
+      return 0;
+    }
+
+    if (!beet_mir_lower_expr(function, expr->left, &rhs_temp)) {
+      return 0;
+    }
+
+    *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_SUB_INT,
+                                        zero_temp, rhs_temp);
+    return *out_temp >= 0;
+  }
+
+  case BEET_AST_EXPR_BINARY:
+    if (expr->left == NULL || expr->right == NULL) {
+      return 0;
+    }
+
+    if (!beet_mir_lower_expr(function, expr->left, &lhs_temp)) {
+      return 0;
+    }
+
+    if (!beet_mir_lower_expr(function, expr->right, &rhs_temp)) {
+      return 0;
+    }
+
+    switch (expr->binary_op) {
+    case BEET_AST_BINARY_ADD:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_ADD_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_SUB:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_SUB_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_MUL:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_MUL_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_DIV:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_DIV_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    default:
+      return 0;
+    }
+
+  default:
+    return 0;
+  }
+}
+
 static int beet_mir_lower_return_stmt(beet_mir_function *function,
                                       const beet_ast_stmt *stmt) {
   int value;
+  int temp;
 
   assert(function != NULL);
   assert(stmt != NULL);
@@ -188,6 +362,13 @@ static int beet_mir_lower_return_stmt(beet_mir_function *function,
   case BEET_AST_EXPR_NAME:
     return beet_mir_add_return_local(function, stmt->expr.text,
                                      stmt->expr.text_len);
+
+  case BEET_AST_EXPR_UNARY:
+  case BEET_AST_EXPR_BINARY:
+    if (!beet_mir_lower_expr(function, &stmt->expr, &temp)) {
+      return 0;
+    }
+    return beet_mir_add_return_temp(function, temp);
 
   default:
     return 0;

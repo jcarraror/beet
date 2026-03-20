@@ -3,7 +3,9 @@
 
 #include "beet/mir/mir.h"
 #include "beet/parser/parser.h"
+#include "beet/resolve/scope.h"
 #include "beet/support/source.h"
+#include "beet/types/check.h"
 
 static void test_lower_binding_to_mir(void) {
   const char *text = "bind x = 10\n";
@@ -124,10 +126,144 @@ static void test_lower_function_body_binding_and_return(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_lower_arithmetic_return_expression(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    return 1 + 2 * 3\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+
+  assert(mir_function.instr_count == 6U);
+
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[0].dst == 0);
+  assert(mir_function.instrs[0].int_value == 1);
+
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[1].dst == 1);
+  assert(mir_function.instrs[1].int_value == 2);
+
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[2].dst == 2);
+  assert(mir_function.instrs[2].int_value == 3);
+
+  assert(mir_function.instrs[3].op == BEET_MIR_OP_MUL_INT);
+  assert(mir_function.instrs[3].dst == 3);
+  assert(mir_function.instrs[3].src_lhs == 1);
+  assert(mir_function.instrs[3].src_rhs == 2);
+
+  assert(mir_function.instrs[4].op == BEET_MIR_OP_ADD_INT);
+  assert(mir_function.instrs[4].dst == 4);
+  assert(mir_function.instrs[4].src_lhs == 0);
+  assert(mir_function.instrs[4].src_rhs == 3);
+
+  assert(mir_function.instrs[5].op == BEET_MIR_OP_RETURN_TEMP);
+  assert(mir_function.instrs[5].dst == 4);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_lower_unary_arithmetic_return_expression(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    return -(1 + 2)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+
+  assert(mir_function.instr_count == 6U);
+
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[0].dst == 0);
+  assert(mir_function.instrs[0].int_value == 0);
+
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[1].dst == 1);
+  assert(mir_function.instrs[1].int_value == 1);
+
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[2].dst == 2);
+  assert(mir_function.instrs[2].int_value == 2);
+
+  assert(mir_function.instrs[3].op == BEET_MIR_OP_ADD_INT);
+  assert(mir_function.instrs[3].dst == 3);
+  assert(mir_function.instrs[3].src_lhs == 1);
+  assert(mir_function.instrs[3].src_rhs == 2);
+
+  assert(mir_function.instrs[4].op == BEET_MIR_OP_SUB_INT);
+  assert(mir_function.instrs[4].dst == 4);
+  assert(mir_function.instrs[4].src_lhs == 0);
+  assert(mir_function.instrs[4].src_rhs == 3);
+
+  assert(mir_function.instrs[5].op == BEET_MIR_OP_RETURN_TEMP);
+  assert(mir_function.instrs[5].dst == 4);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_lower_arithmetic_with_local_load(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind x = 10\n"
+                     "    return x + 2\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+
+  assert(mir_function.instr_count == 6U);
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_BIND_LOCAL);
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_LOAD_LOCAL);
+  assert(strcmp(mir_function.instrs[2].name, "x") == 0);
+  assert(mir_function.instrs[3].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[3].int_value == 2);
+  assert(mir_function.instrs[4].op == BEET_MIR_OP_ADD_INT);
+  assert(mir_function.instrs[4].src_lhs == 1);
+  assert(mir_function.instrs[4].src_rhs == 2);
+  assert(mir_function.instrs[5].op == BEET_MIR_OP_RETURN_TEMP);
+  assert(mir_function.instrs[5].dst == 3);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_lower_binding_to_mir();
   test_lower_mutable_binding_to_mir();
   test_lower_trivial_function_return();
   test_lower_function_body_binding_and_return();
+  test_lower_arithmetic_return_expression();
+  test_lower_unary_arithmetic_return_expression();
+  test_lower_arithmetic_with_local_load();
   return 0;
 }

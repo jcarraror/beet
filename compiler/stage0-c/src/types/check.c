@@ -13,7 +13,6 @@ typedef struct beet_local_type {
 
 #define BEET_TYPE_CHECK_MAX_LOCALS 128
 
-
 static beet_type beet_type_from_value_text(const char *text, size_t len) {
   beet_type type;
   size_t i;
@@ -82,9 +81,9 @@ static int beet_name_equals_slice(const char *left, size_t left_len,
   return left_len == right_len && strncmp(left, right, left_len) == 0;
 }
 
-static const beet_local_type *beet_find_local_type(
-    const beet_local_type *locals, size_t local_count, const char *name,
-    size_t name_len) {
+static const beet_local_type *
+beet_find_local_type(const beet_local_type *locals, size_t local_count,
+                     const char *name, size_t name_len) {
   size_t i;
 
   assert(locals != NULL || local_count == 0U);
@@ -123,7 +122,8 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
     return type;
 
   case BEET_AST_EXPR_NAME:
-    local = beet_find_local_type(locals, local_count, expr->text, expr->text_len);
+    local =
+        beet_find_local_type(locals, local_count, expr->text, expr->text_len);
     if (local == NULL) {
       return type;
     }
@@ -230,8 +230,9 @@ int beet_type_check_function_body(const beet_ast_function *function_ast) {
 
   local_count = 0U;
   for (i = 0U; i < function_ast->param_count; ++i) {
-    beet_type param_type = beet_type_from_name_slice(
-        function_ast->params[i].type_name, function_ast->params[i].type_name_len);
+    beet_type param_type =
+        beet_type_from_name_slice(function_ast->params[i].type_name,
+                                  function_ast->params[i].type_name_len);
     if (!beet_type_is_known(&param_type) ||
         local_count >= BEET_TYPE_CHECK_MAX_LOCALS) {
       return 0;
@@ -276,7 +277,8 @@ int beet_type_check_function_body(const beet_ast_function *function_ast) {
     }
 
     case BEET_AST_STMT_RETURN: {
-      beet_type expr_type = beet_type_check_expr(&stmt->expr, locals, local_count);
+      beet_type expr_type =
+          beet_type_check_expr(&stmt->expr, locals, local_count);
       if (expr_type.kind != return_type.kind) {
         return 0;
       }
