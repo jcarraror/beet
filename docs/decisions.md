@@ -85,3 +85,15 @@ Reason:
 Tradeoff:
 - more memory overhead
 - setup work when loading each file
+
+## 2026-03-20 — Lexer Produces Explicit Error Tokens
+
+Lexer produces explicit error tokens for unsupported characters instead of
+aborting immediately.
+
+Reason:
+- keeps lexing testable
+- lets later stages decide how to report or recover
+
+Tradeoff:
+- parser must reject error tokens explicitly

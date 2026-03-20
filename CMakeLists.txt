@@ -18,6 +18,7 @@ target_compile_options(beet_warnings INTERFACE ${BEET_WARNING_FLAGS})
 add_library(beet_compiler_support
     compiler/stage0-c/src/support/source.c
     compiler/stage0-c/src/diag/diag.c
+    compiler/stage0-c/src/lexer/lexer.c
 )
 target_include_directories(beet_compiler_support
     PUBLIC
