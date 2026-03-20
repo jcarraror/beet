@@ -160,6 +160,86 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
   }
 }
 
+static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
+                                     size_t stmt_count, beet_type return_type,
+                                     beet_local_type *locals,
+                                     size_t *local_count) {
+  size_t i;
+
+  assert(stmts != NULL || stmt_count == 0U);
+  assert(locals != NULL);
+  assert(local_count != NULL);
+
+  for (i = 0U; i < stmt_count; ++i) {
+    const beet_ast_stmt *stmt = &stmts[i];
+
+    switch (stmt->kind) {
+    case BEET_AST_STMT_BINDING: {
+      beet_type binding_type;
+      beet_type_check_result result;
+
+      if (stmt->binding.has_type) {
+        result = beet_type_check_binding_annotation(&stmt->binding);
+        if (!result.ok) {
+          return 0;
+        }
+        binding_type = result.declared_type;
+      } else {
+        binding_type = beet_type_check_binding(&stmt->binding);
+        if (!beet_type_is_known(&binding_type)) {
+          return 0;
+        }
+      }
+
+      if (*local_count >= BEET_TYPE_CHECK_MAX_LOCALS) {
+        return 0;
+      }
+
+      locals[*local_count].name = stmt->binding.name;
+      locals[*local_count].name_len = stmt->binding.name_len;
+      locals[*local_count].type = binding_type;
+      *local_count += 1U;
+      break;
+    }
+
+    case BEET_AST_STMT_RETURN: {
+      beet_type expr_type =
+          beet_type_check_expr(&stmt->expr, locals, *local_count);
+      if (expr_type.kind != return_type.kind) {
+        return 0;
+      }
+      break;
+    }
+
+    case BEET_AST_STMT_IF: {
+      beet_type condition_type;
+      beet_local_type branch_locals[BEET_TYPE_CHECK_MAX_LOCALS];
+      size_t branch_local_count;
+
+      condition_type =
+          beet_type_check_expr(&stmt->condition, locals, *local_count);
+      if (condition_type.kind != BEET_TYPE_BOOL) {
+        return 0;
+      }
+
+      memcpy(branch_locals, locals, sizeof(beet_local_type) * (*local_count));
+      branch_local_count = *local_count;
+      if (!beet_type_check_stmt_list(stmt->then_body, stmt->then_body_count,
+                                     return_type, branch_locals,
+                                     &branch_local_count)) {
+        return 0;
+      }
+      break;
+    }
+
+    default:
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 beet_type_check_result
 beet_type_check_binding_annotation(const beet_ast_binding *binding) {
   beet_type_check_result result;
@@ -244,59 +324,18 @@ int beet_type_check_function_body(const beet_ast_function *function_ast) {
     local_count += 1U;
   }
 
-  for (i = 0U; i < function_ast->body_count; ++i) {
-    const beet_ast_stmt *stmt = &function_ast->body[i];
-
-    switch (stmt->kind) {
-    case BEET_AST_STMT_BINDING: {
-      beet_type binding_type;
-      beet_type_check_result result;
-
-      if (stmt->binding.has_type) {
-        result = beet_type_check_binding_annotation(&stmt->binding);
-        if (!result.ok) {
-          return 0;
-        }
-        binding_type = result.declared_type;
-      } else {
-        binding_type = beet_type_check_binding(&stmt->binding);
-        if (!beet_type_is_known(&binding_type)) {
-          return 0;
-        }
-      }
-
-      if (local_count >= BEET_TYPE_CHECK_MAX_LOCALS) {
-        return 0;
-      }
-
-      locals[local_count].name = stmt->binding.name;
-      locals[local_count].name_len = stmt->binding.name_len;
-      locals[local_count].type = binding_type;
-      local_count += 1U;
-      break;
-    }
-
-    case BEET_AST_STMT_RETURN: {
-      beet_type expr_type =
-          beet_type_check_expr(&stmt->expr, locals, local_count);
-      if (expr_type.kind != return_type.kind) {
-        return 0;
-      }
-      break;
-    }
-
-    default:
-      return 0;
-    }
-  }
-
-  return 1;
+  return beet_type_check_stmt_list(function_ast->body, function_ast->body_count,
+                                   return_type, locals, &local_count);
 }
 
 int beet_type_check_type_decl(const beet_ast_type_decl *type_decl) {
   size_t i;
 
   assert(type_decl != NULL);
+
+  if (!type_decl->is_structure) {
+    return 0;
+  }
 
   for (i = 0U; i < type_decl->field_count; ++i) {
     beet_type field_type = beet_type_from_name_slice(
