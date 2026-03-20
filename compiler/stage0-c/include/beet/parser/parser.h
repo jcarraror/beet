@@ -5,8 +5,8 @@
 #include "beet/parser/ast.h"
 
 typedef struct beet_parser {
-    beet_lexer lexer;
-    beet_token current;
+  beet_lexer lexer;
+  beet_token current;
 } beet_parser;
 
 void beet_parser_init(beet_parser *parser, const beet_source_file *file);

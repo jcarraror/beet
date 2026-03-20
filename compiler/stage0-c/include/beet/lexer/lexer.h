@@ -5,8 +5,8 @@
 #include "beet/support/source.h"
 
 typedef struct beet_lexer {
-    const beet_source_file *file;
-    size_t offset;
+  const beet_source_file *file;
+  size_t offset;
 } beet_lexer;
 
 void beet_lexer_init(beet_lexer *lexer, const beet_source_file *file);

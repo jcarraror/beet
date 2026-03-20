@@ -6,41 +6,41 @@
 #include "beet/support/source.h"
 
 typedef enum beet_token_kind {
-    BEET_TOKEN_ERROR = 0,
-    BEET_TOKEN_EOF,
+  BEET_TOKEN_ERROR = 0,
+  BEET_TOKEN_EOF,
 
-    BEET_TOKEN_IDENTIFIER,
-    BEET_TOKEN_INT_LITERAL,
+  BEET_TOKEN_IDENTIFIER,
+  BEET_TOKEN_INT_LITERAL,
 
-    BEET_TOKEN_KW_BIND,
-    BEET_TOKEN_KW_MUTABLE,
-    BEET_TOKEN_KW_FUNCTION,
-    BEET_TOKEN_KW_RETURNS,
-    BEET_TOKEN_KW_RETURN,
-    BEET_TOKEN_KW_IS,
-    BEET_TOKEN_KW_TYPE,
-    BEET_TOKEN_KW_STRUCTURE,
-    BEET_TOKEN_KW_CHOICE,
-    BEET_TOKEN_KW_MATCH,
-    BEET_TOKEN_KW_CASE,
-    BEET_TOKEN_KW_IF,
-    BEET_TOKEN_KW_BORROWED,
-    BEET_TOKEN_KW_OWNED,
+  BEET_TOKEN_KW_BIND,
+  BEET_TOKEN_KW_MUTABLE,
+  BEET_TOKEN_KW_FUNCTION,
+  BEET_TOKEN_KW_RETURNS,
+  BEET_TOKEN_KW_RETURN,
+  BEET_TOKEN_KW_IS,
+  BEET_TOKEN_KW_TYPE,
+  BEET_TOKEN_KW_STRUCTURE,
+  BEET_TOKEN_KW_CHOICE,
+  BEET_TOKEN_KW_MATCH,
+  BEET_TOKEN_KW_CASE,
+  BEET_TOKEN_KW_IF,
+  BEET_TOKEN_KW_BORROWED,
+  BEET_TOKEN_KW_OWNED,
 
-    BEET_TOKEN_LPAREN,
-    BEET_TOKEN_RPAREN,
-    BEET_TOKEN_LBRACE,
-    BEET_TOKEN_RBRACE,
-    BEET_TOKEN_COMMA,
-    BEET_TOKEN_DOT,
-    BEET_TOKEN_EQUAL
+  BEET_TOKEN_LPAREN,
+  BEET_TOKEN_RPAREN,
+  BEET_TOKEN_LBRACE,
+  BEET_TOKEN_RBRACE,
+  BEET_TOKEN_COMMA,
+  BEET_TOKEN_DOT,
+  BEET_TOKEN_EQUAL
 } beet_token_kind;
 
 typedef struct beet_token {
-    beet_token_kind kind;
-    beet_source_span span;
-    const char *lexeme;
-    size_t lexeme_len;
+  beet_token_kind kind;
+  beet_source_span span;
+  const char *lexeme;
+  size_t lexeme_len;
 } beet_token;
 
 const char *beet_token_kind_name(beet_token_kind kind);
