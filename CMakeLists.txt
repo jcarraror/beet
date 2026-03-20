@@ -19,6 +19,7 @@ add_library(beet_compiler_support
     compiler/stage0-c/src/support/source.c
     compiler/stage0-c/src/diag/diag.c
     compiler/stage0-c/src/lexer/lexer.c
+    compiler/stage0-c/src/parser/parser.c
 )
 target_include_directories(beet_compiler_support
     PUBLIC
@@ -68,6 +69,13 @@ add_executable(test_lexer_tokens
     tests/lexer_tokens.c
 )
 target_link_libraries(test_lexer_tokens PRIVATE beet_compiler_support)
+
+add_executable(test_parser_binding
+    tests/parser_binding.c
+)
+target_link_libraries(test_parser_binding PRIVATE beet_compiler_support)
+
+add_test(NAME parser_binding COMMAND test_parser_binding)
 
 add_test(NAME smoke_compiler COMMAND test_smoke_compiler)
 add_test(NAME smoke_vm COMMAND test_smoke_vm)
