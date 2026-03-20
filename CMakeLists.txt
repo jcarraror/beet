@@ -26,6 +26,7 @@ add_library(beet_compiler_support
     compiler/stage0-c/src/mir/mir.c
     compiler/stage0-c/src/codegen/codegen.c
     runtime/vm/src/bytecode.c
+    runtime/vm/src/interpreter.c
 )
 target_include_directories(beet_compiler_support
     PUBLIC
@@ -47,6 +48,7 @@ target_link_libraries(beetc0 PRIVATE beet_compiler_support)
 add_executable(beet-vm
     runtime/vm/src/main.c
     runtime/vm/src/bytecode.c
+    runtime/vm/src/interpreter.c
 )
 target_include_directories(beet-vm
     PRIVATE
@@ -114,6 +116,11 @@ add_executable(test_codegen_bytecode
 )
 target_link_libraries(test_codegen_bytecode PRIVATE beet_compiler_support)
 
+add_executable(test_vm_execution
+    tests/vm_execution.c
+)
+target_link_libraries(test_vm_execution PRIVATE beet_compiler_support)
+
 add_test(NAME smoke_compiler COMMAND test_smoke_compiler)
 add_test(NAME smoke_vm COMMAND test_smoke_vm)
 add_test(NAME diag_print COMMAND test_diag_print)
@@ -126,3 +133,4 @@ add_test(NAME resolve_scope COMMAND test_resolve_scope)
 add_test(NAME types_check COMMAND test_types_check)
 add_test(NAME mir_lowering COMMAND test_mir_lowering)
 add_test(NAME codegen_bytecode COMMAND test_codegen_bytecode)
+add_test(NAME vm_execution COMMAND test_vm_execution)
