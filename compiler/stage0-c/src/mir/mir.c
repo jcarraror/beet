@@ -215,6 +215,12 @@ int beet_mir_lower_function(beet_mir_function *function,
     const beet_ast_stmt *stmt = &function_ast->body[i];
 
     switch (stmt->kind) {
+    case BEET_AST_STMT_BINDING:
+      if (!beet_mir_lower_binding(function, &stmt->binding)) {
+        return 0;
+      }
+      break;
+
     case BEET_AST_STMT_RETURN:
       if (!beet_mir_lower_return_stmt(function, stmt)) {
         return 0;
