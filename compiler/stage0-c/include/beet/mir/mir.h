@@ -49,6 +49,9 @@ int beet_mir_lower_binding(beet_mir_function *function,
 
 int beet_mir_lower_trivial_return_function(
     beet_mir_function *function, const beet_ast_function *function_ast,
-    int return_value);
+    size_t entry_index);
+
+int beet_mir_lower_function(beet_mir_function *function,
+                            const beet_ast_function *function_ast);
 
 #endif
