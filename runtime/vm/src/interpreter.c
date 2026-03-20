@@ -1,6 +1,7 @@
 #include "beet/vm/interpreter.h"
 
 #include <assert.h>
+#include <string.h>
 
 int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
                     int *out_result) {
@@ -9,6 +10,9 @@ int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
   assert(vm != NULL);
   assert(function != NULL);
   assert(out_result != NULL);
+
+  memset(vm->regs, 0, sizeof(vm->regs));
+  memset(vm->locals, 0, sizeof(vm->locals));
 
   pc = 0U;
 
@@ -30,9 +34,57 @@ int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
       break;
     }
 
+    case BEET_BC_OP_LOAD_LOCAL: {
+      int dst = function->code[pc++];
+      int local_index = function->code[pc++];
+      vm->regs[dst] = vm->locals[local_index];
+      break;
+    }
+
+    case BEET_BC_OP_ADD_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = vm->regs[lhs] + vm->regs[rhs];
+      break;
+    }
+
+    case BEET_BC_OP_SUB_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = vm->regs[lhs] - vm->regs[rhs];
+      break;
+    }
+
+    case BEET_BC_OP_MUL_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = vm->regs[lhs] * vm->regs[rhs];
+      break;
+    }
+
+    case BEET_BC_OP_DIV_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      if (vm->regs[rhs] == 0) {
+        return 0;
+      }
+      vm->regs[dst] = vm->regs[lhs] / vm->regs[rhs];
+      break;
+    }
+
     case BEET_BC_OP_RETURN_LOCAL: {
       int local_index = function->code[pc++];
       *out_result = vm->locals[local_index];
+      return 1;
+    }
+
+    case BEET_BC_OP_RETURN_TEMP: {
+      int temp = function->code[pc++];
+      *out_result = vm->regs[temp];
       return 1;
     }
 
