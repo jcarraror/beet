@@ -117,6 +117,19 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr) {
     expr->resolved_is_mutable = symbol->is_mutable;
     return 1;
 
+  case BEET_AST_EXPR_UNARY:
+    if (expr->left == NULL) {
+      return 0;
+    }
+    return beet_resolve_expr(stack, expr->left);
+
+  case BEET_AST_EXPR_BINARY:
+    if (expr->left == NULL || expr->right == NULL) {
+      return 0;
+    }
+    return beet_resolve_expr(stack, expr->left) &&
+           beet_resolve_expr(stack, expr->right);
+
   default:
     return 0;
   }

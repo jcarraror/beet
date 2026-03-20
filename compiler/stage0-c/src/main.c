@@ -61,6 +61,12 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
     return 0;
   }
 
+  if (!beet_type_check_function_body(&function_ast)) {
+    fprintf(stderr, "error: invalid function body types in '%s'\n", path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
   if (!beet_mir_lower_function(&mir_function, &function_ast)) {
     fprintf(stderr, "error: failed to lower function to MIR\n");
     beet_source_file_dispose(&file);

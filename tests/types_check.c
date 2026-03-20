@@ -107,11 +107,74 @@ static void test_type_decl_fields_known(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_body_arithmetic_ok(void) {
+  const char *text = "function add(x is Int, y is Int) returns Int {\n"
+                     "    return x + y * 2\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_function_body_unary_grouped_int_ok(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    return -(1 + 2)\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_function_body_arithmetic_rejects_non_int(void) {
+  const char *text = "function bad(flag is Bool) returns Int {\n"
+                     "    return flag + 1\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(!beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_infer_int_binding();
   test_typed_binding_ok();
   test_typed_binding_mismatch();
   test_function_signature_types();
   test_type_decl_fields_known();
+  test_function_body_arithmetic_ok();
+  test_function_body_unary_grouped_int_ok();
+  test_function_body_arithmetic_rejects_non_int();
   return 0;
 }
