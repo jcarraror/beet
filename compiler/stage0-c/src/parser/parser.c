@@ -52,9 +52,11 @@ int beet_parser_parse_binding(beet_parser *parser, beet_ast_binding *out) {
   }
 
   out->name = parser->current.lexeme;
+  out->name_len = parser->current.lexeme_len;
   out->is_mutable = is_mutable;
   out->has_type = 0;
   out->type_name = NULL;
+  out->type_name_len = 0U;
 
   beet_parser_advance(parser);
 
@@ -65,6 +67,7 @@ int beet_parser_parse_binding(beet_parser *parser, beet_ast_binding *out) {
 
     out->has_type = 1;
     out->type_name = parser->current.lexeme;
+    out->type_name_len = parser->current.lexeme_len;
 
     beet_parser_advance(parser);
   }
@@ -94,6 +97,7 @@ static int beet_parser_parse_param(beet_parser *parser, beet_ast_param *out) {
   }
 
   out->name = parser->current.lexeme;
+  out->name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
   if (!beet_expect(parser, BEET_TOKEN_KW_IS)) {
@@ -105,6 +109,7 @@ static int beet_parser_parse_param(beet_parser *parser, beet_ast_param *out) {
   }
 
   out->type_name = parser->current.lexeme;
+  out->type_name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
   return 1;
@@ -145,7 +150,9 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
   }
 
   out->name = parser->current.lexeme;
+  out->name_len = parser->current.lexeme_len;
   out->return_type_name = NULL;
+  out->return_type_name_len = 0U;
   out->param_count = 0U;
 
   beet_parser_advance(parser);
@@ -187,6 +194,7 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
   }
 
   out->return_type_name = parser->current.lexeme;
+  out->return_type_name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
   if (!beet_expect(parser, BEET_TOKEN_LBRACE)) {
@@ -209,6 +217,7 @@ static int beet_parser_parse_field(beet_parser *parser, beet_ast_field *out) {
   }
 
   out->name = parser->current.lexeme;
+  out->name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
   if (!beet_expect(parser, BEET_TOKEN_KW_IS)) {
@@ -220,6 +229,7 @@ static int beet_parser_parse_field(beet_parser *parser, beet_ast_field *out) {
   }
 
   out->type_name = parser->current.lexeme;
+  out->type_name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
   return 1;
@@ -238,6 +248,7 @@ int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out) {
   }
 
   out->name = parser->current.lexeme;
+  out->name_len = parser->current.lexeme_len;
   out->is_structure = 0;
   out->field_count = 0U;
 
