@@ -94,9 +94,55 @@ static void test_name_return_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_body_bindings(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind x = 10\n"
+                     "    mutable total is Int = 25\n"
+                     "    return total\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 3U);
+
+  assert(function_ast.body[0].kind == BEET_AST_STMT_BINDING);
+  assert(function_ast.body[0].binding.is_mutable == 0);
+  assert(function_ast.body[0].binding.has_type == 0);
+  assert(function_ast.body[0].binding.name_len == 1U);
+  assert(strncmp(function_ast.body[0].binding.name, "x", 1) == 0);
+  assert(function_ast.body[0].binding.value_len == 2U);
+  assert(strncmp(function_ast.body[0].binding.value_text, "10", 2) == 0);
+
+  assert(function_ast.body[1].kind == BEET_AST_STMT_BINDING);
+  assert(function_ast.body[1].binding.is_mutable == 1);
+  assert(function_ast.body[1].binding.has_type == 1);
+  assert(function_ast.body[1].binding.name_len == 5U);
+  assert(strncmp(function_ast.body[1].binding.name, "total", 5) == 0);
+  assert(function_ast.body[1].binding.type_name_len == 3U);
+  assert(strncmp(function_ast.body[1].binding.type_name, "Int", 3) == 0);
+  assert(function_ast.body[1].binding.value_len == 2U);
+  assert(strncmp(function_ast.body[1].binding.value_text, "25", 2) == 0);
+
+  assert(function_ast.body[2].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[2].expr.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[2].expr.text_len == 5U);
+  assert(strncmp(function_ast.body[2].expr.text, "total", 5) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_empty_function();
   test_function_with_params();
   test_name_return_function();
+  test_function_body_bindings();
   return 0;
 }

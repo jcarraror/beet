@@ -145,8 +145,25 @@ static int beet_parser_parse_stmt(beet_parser *parser, beet_ast_stmt *out) {
   assert(parser != NULL);
   assert(out != NULL);
 
+  if (parser->current.kind == BEET_TOKEN_KW_BIND ||
+      parser->current.kind == BEET_TOKEN_KW_MUTABLE) {
+    out->kind = BEET_AST_STMT_BINDING;
+    out->expr.kind = BEET_AST_EXPR_INVALID;
+    out->expr.text = NULL;
+    out->expr.text_len = 0U;
+    return beet_parser_parse_binding(parser, &out->binding);
+  }
+
   if (parser->current.kind == BEET_TOKEN_KW_RETURN) {
     out->kind = BEET_AST_STMT_RETURN;
+    out->binding.name = NULL;
+    out->binding.name_len = 0U;
+    out->binding.is_mutable = 0;
+    out->binding.has_type = 0;
+    out->binding.type_name = NULL;
+    out->binding.type_name_len = 0U;
+    out->binding.value_text = NULL;
+    out->binding.value_len = 0U;
     beet_parser_advance(parser);
     return beet_parser_parse_expr(parser, &out->expr);
   }

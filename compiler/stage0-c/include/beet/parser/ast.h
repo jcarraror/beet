@@ -19,16 +19,6 @@ typedef struct beet_ast_expr {
   size_t text_len;
 } beet_ast_expr;
 
-typedef enum beet_ast_stmt_kind {
-  BEET_AST_STMT_INVALID = 0,
-  BEET_AST_STMT_RETURN
-} beet_ast_stmt_kind;
-
-typedef struct beet_ast_stmt {
-  beet_ast_stmt_kind kind;
-  beet_ast_expr expr;
-} beet_ast_stmt;
-
 typedef struct beet_ast_binding {
   const char *name;
   size_t name_len;
@@ -42,6 +32,18 @@ typedef struct beet_ast_binding {
   const char *value_text;
   size_t value_len;
 } beet_ast_binding;
+
+typedef enum beet_ast_stmt_kind {
+  BEET_AST_STMT_INVALID = 0,
+  BEET_AST_STMT_BINDING,
+  BEET_AST_STMT_RETURN
+} beet_ast_stmt_kind;
+
+typedef struct beet_ast_stmt {
+  beet_ast_stmt_kind kind;
+  beet_ast_binding binding;
+  beet_ast_expr expr;
+} beet_ast_stmt;
 
 typedef struct beet_ast_param {
   const char *name;
