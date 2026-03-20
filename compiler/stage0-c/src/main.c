@@ -29,10 +29,15 @@ static void beet_dump_tokens(const beet_source_file *file) {
 
 int main(void) {
     const char *text =
-        "module main\n"
-        "fn main() -> Int = {\n"
-        "    let x = 1\n"
-        "    x + 2\n"
+        "type Point = structure {\n"
+        "    x is Int\n"
+        "    y is Int\n"
+        "}\n"
+        "\n"
+        "function main() returns Int {\n"
+        "    bind point = Point(x = 3, y = 4)\n"
+        "    mutable total = 0\n"
+        "    return 0\n"
         "}\n";
 
     beet_source_file file;

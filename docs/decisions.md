@@ -97,3 +97,27 @@ Reason:
 
 Tradeoff:
 - parser must reject error tokens explicitly
+
+## 2026-03-20 — Lexer Token Set Aligned to Beet Syntax
+
+The lexer now targets Beet surface syntax directly.
+
+Added keywords:
+- `bind`
+- `mutable`
+- `function`
+- `returns`
+- `return`
+- `is`
+- `type`
+- `structure`
+- `choice`
+- `match`
+- `case`
+- `if`
+- `borrowed`
+- `owned`
+
+Reason:
+- keep the frontend aligned with Beet’s actual language design
+- avoid prototype syntax drifting away from the spec
