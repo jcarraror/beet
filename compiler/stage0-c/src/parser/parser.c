@@ -130,6 +130,24 @@ static void beet_ast_expr_init(beet_ast_expr *expr) {
   expr->right = NULL;
 }
 
+static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
+  assert(stmt != NULL);
+
+  stmt->kind = BEET_AST_STMT_INVALID;
+  stmt->binding.name = NULL;
+  stmt->binding.name_len = 0U;
+  stmt->binding.is_mutable = 0;
+  stmt->binding.has_type = 0;
+  stmt->binding.type_name = NULL;
+  stmt->binding.type_name_len = 0U;
+  stmt->binding.value_text = NULL;
+  stmt->binding.value_len = 0U;
+  beet_ast_expr_init(&stmt->expr);
+  beet_ast_expr_init(&stmt->condition);
+  stmt->then_body = NULL;
+  stmt->then_body_count = 0U;
+}
+
 static beet_ast_expr *beet_ast_expr_alloc(beet_ast_function *function) {
   beet_ast_expr *expr;
 
@@ -159,6 +177,21 @@ static beet_ast_expr *beet_ast_expr_store(beet_ast_function *function,
 
   *expr = *source;
   return expr;
+}
+
+static beet_ast_stmt *beet_ast_stmt_alloc(beet_ast_function *function) {
+  beet_ast_stmt *stmt;
+
+  assert(function != NULL);
+
+  if (function->stmt_node_count >= BEET_AST_MAX_STMT_NODES) {
+    return NULL;
+  }
+
+  stmt = &function->stmt_nodes[function->stmt_node_count];
+  function->stmt_node_count += 1U;
+  beet_ast_stmt_init(stmt);
+  return stmt;
 }
 
 static int beet_parser_parse_expr(beet_parser *parser,
@@ -334,32 +367,80 @@ static int beet_parser_parse_expr(beet_parser *parser,
 
 static int beet_parser_parse_stmt(beet_parser *parser,
                                   beet_ast_function *function,
+                                  beet_ast_stmt *out);
+
+static int beet_parser_parse_if_stmt(beet_parser *parser,
+                                     beet_ast_function *function,
+                                     beet_ast_stmt *out) {
+  size_t body_start;
+
+  assert(parser != NULL);
+  assert(function != NULL);
+  assert(out != NULL);
+
+  if (!beet_expect(parser, BEET_TOKEN_KW_IF)) {
+    return 0;
+  }
+
+  out->kind = BEET_AST_STMT_IF;
+  if (!beet_parser_parse_expr(parser, function, &out->condition)) {
+    return 0;
+  }
+
+  if (!beet_expect(parser, BEET_TOKEN_LBRACE)) {
+    return 0;
+  }
+
+  body_start = function->stmt_node_count;
+  while (parser->current.kind != BEET_TOKEN_RBRACE) {
+    beet_ast_stmt *nested_stmt;
+
+    nested_stmt = beet_ast_stmt_alloc(function);
+    if (nested_stmt == NULL) {
+      return 0;
+    }
+
+    if (!beet_parser_parse_stmt(parser, function, nested_stmt)) {
+      return 0;
+    }
+
+    out->then_body_count += 1U;
+  }
+
+  if (!beet_expect(parser, BEET_TOKEN_RBRACE)) {
+    return 0;
+  }
+
+  if (out->then_body_count > 0U) {
+    out->then_body = &function->stmt_nodes[body_start];
+  }
+
+  return 1;
+}
+
+static int beet_parser_parse_stmt(beet_parser *parser,
+                                  beet_ast_function *function,
                                   beet_ast_stmt *out) {
   assert(parser != NULL);
   assert(function != NULL);
   assert(out != NULL);
 
+  beet_ast_stmt_init(out);
+
   if (parser->current.kind == BEET_TOKEN_KW_BIND ||
       parser->current.kind == BEET_TOKEN_KW_MUTABLE) {
     out->kind = BEET_AST_STMT_BINDING;
-    out->expr.kind = BEET_AST_EXPR_INVALID;
-    out->expr.text = NULL;
-    out->expr.text_len = 0U;
     return beet_parser_parse_binding(parser, &out->binding);
   }
 
   if (parser->current.kind == BEET_TOKEN_KW_RETURN) {
     out->kind = BEET_AST_STMT_RETURN;
-    out->binding.name = NULL;
-    out->binding.name_len = 0U;
-    out->binding.is_mutable = 0;
-    out->binding.has_type = 0;
-    out->binding.type_name = NULL;
-    out->binding.type_name_len = 0U;
-    out->binding.value_text = NULL;
-    out->binding.value_len = 0U;
     beet_parser_advance(parser);
     return beet_parser_parse_expr(parser, function, &out->expr);
+  }
+
+  if (parser->current.kind == BEET_TOKEN_KW_IF) {
+    return beet_parser_parse_if_stmt(parser, function, out);
   }
 
   out->kind = BEET_AST_STMT_INVALID;
@@ -384,6 +465,7 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
   out->return_type_name_len = 0U;
   out->param_count = 0U;
   out->body_count = 0U;
+  out->stmt_node_count = 0U;
   out->expr_count = 0U;
 
   beet_parser_advance(parser);

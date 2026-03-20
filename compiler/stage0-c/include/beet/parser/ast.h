@@ -6,6 +6,7 @@
 #define BEET_AST_MAX_PARAMS 16
 #define BEET_AST_MAX_FIELDS 32
 #define BEET_AST_MAX_BODY_STMTS 64
+#define BEET_AST_MAX_STMT_NODES 128
 #define BEET_AST_MAX_EXPR_NODES 128
 
 typedef enum beet_ast_expr_kind {
@@ -57,13 +58,17 @@ typedef struct beet_ast_binding {
 typedef enum beet_ast_stmt_kind {
   BEET_AST_STMT_INVALID = 0,
   BEET_AST_STMT_BINDING,
-  BEET_AST_STMT_RETURN
+  BEET_AST_STMT_RETURN,
+  BEET_AST_STMT_IF
 } beet_ast_stmt_kind;
 
 typedef struct beet_ast_stmt {
   beet_ast_stmt_kind kind;
   beet_ast_binding binding;
   beet_ast_expr expr;
+  beet_ast_expr condition;
+  struct beet_ast_stmt *then_body;
+  size_t then_body_count;
 } beet_ast_stmt;
 
 typedef struct beet_ast_param {
@@ -86,6 +91,9 @@ typedef struct beet_ast_function {
 
   beet_ast_stmt body[BEET_AST_MAX_BODY_STMTS];
   size_t body_count;
+
+  beet_ast_stmt stmt_nodes[BEET_AST_MAX_STMT_NODES];
+  size_t stmt_node_count;
 
   beet_ast_expr expr_nodes[BEET_AST_MAX_EXPR_NODES];
   size_t expr_count;
