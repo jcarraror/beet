@@ -65,3 +65,23 @@ Tradeoff:
 - more verbose than full inference systems
 
 ---
+
+## 2026-03-20 — Source Files Own Their Text Buffers
+
+Compiler source files are represented by owned buffers rather than borrowed
+C strings.
+
+Reason:
+- explicit ownership and cleanup
+- safe file loading
+- predictable lifetime across compiler passes
+
+Additionally, source files maintain a line-start index.
+
+Reason:
+- efficient offset to line/column mapping
+- avoids repeated O(n) scans in diagnostics and later lexer errors
+
+Tradeoff:
+- more memory overhead
+- setup work when loading each file

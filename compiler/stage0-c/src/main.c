@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "beet/compiler/api.h"
 #include "beet/diag/diag.h"
@@ -11,8 +12,17 @@ int main(void) {
         "    x +\n"
         "}\n";
 
-    beet_source_file file = beet_source_file_from_cstr("demo.beet", text);
+    beet_source_file file;
     beet_diag diag;
+    int exit_code;
+
+    beet_source_file_init(&file);
+    exit_code = 0;
+
+    if (!beet_source_file_set_text_copy(&file, "demo.beet", text)) {
+        fputs("failed to initialize source file\n", stderr);
+        return 1;
+    }
 
     puts(BEET_COMPILER_NAME ": stage0 compiler bootstrap");
 
@@ -24,5 +34,6 @@ int main(void) {
 
     beet_diag_emit(stdout, &diag, (beet_diag_options){ true });
 
-    return 0;
+    beet_source_file_dispose(&file);
+    return exit_code;
 }

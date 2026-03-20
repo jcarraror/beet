@@ -2,13 +2,11 @@
 
 #include <assert.h>
 #include <stddef.h>
-#include <string.h>
 
 #define BEET_COLOR_RESET   "\x1b[0m"
 #define BEET_COLOR_RED     "\x1b[31m"
 #define BEET_COLOR_YELLOW  "\x1b[33m"
 #define BEET_COLOR_BLUE    "\x1b[34m"
-#define BEET_COLOR_BOLD    "\x1b[1m"
 
 static const char *beet_level_name(beet_diag_level level) {
     switch (level) {
@@ -51,49 +49,9 @@ static void beet_print_colored(
 
 static void beet_print_repeat(FILE *stream, char ch, unsigned count) {
     unsigned i;
-    for (i = 0; i < count; ++i) {
+    for (i = 0U; i < count; ++i) {
         fputc((int)ch, stream);
     }
-}
-
-static void beet_find_line_bounds(
-    const beet_source_file *file,
-    unsigned target_line,
-    size_t *line_start,
-    size_t *line_end
-) {
-    size_t i;
-    unsigned line;
-
-    assert(file != NULL);
-    assert(line_start != NULL);
-    assert(line_end != NULL);
-
-    *line_start = 0U;
-    *line_end = file->text_len;
-
-    line = 1U;
-    // Find the start of the target line
-    for (i = 0; i < file->text_len; ++i) {
-        if (line == target_line) {
-            *line_start = i;
-            break;
-        }
-        // Count lines by looking for newline characters
-        if (file->text[i] == '\n') {
-            line += 1U;
-        }
-    }
-
-    // Find the end of the target line
-    for (i = *line_start; i < file->text_len; ++i) {
-        if (file->text[i] == '\n') {
-            *line_end = i;
-            return;
-        }
-    }
-
-    *line_end = file->text_len;
 }
 
 static void beet_emit_header(
@@ -101,11 +59,12 @@ static void beet_emit_header(
     const beet_diag *diag,
     beet_diag_options options
 ) {
-    const char *level_text = beet_level_name(diag->level);
-    const char *level_color = beet_level_color(diag->level);
-
-    beet_print_colored(stream, options.use_color, BEET_COLOR_BOLD, "");
-    beet_print_colored(stream, options.use_color, level_color, level_text);
+    beet_print_colored(
+        stream,
+        options.use_color,
+        beet_level_color(diag->level),
+        beet_level_name(diag->level)
+    );
     fputs(": ", stream);
     fputs(diag->message, stream);
     fputc('\n', stream);
@@ -124,28 +83,22 @@ static void beet_emit_source_line(
     const beet_diag *diag,
     beet_diag_options options
 ) {
-    size_t line_start;
-    size_t line_end;
-    size_t i;
+    const char *line_text;
+    size_t line_len;
     unsigned underline_column;
     unsigned underline_width;
-    unsigned line_no = diag->span.start.line;
+    unsigned line_no;
 
-    beet_find_line_bounds(diag->file, line_no, &line_start, &line_end);
+    line_no = diag->span.start.line;
+    line_text = beet_source_line_text(diag->file, line_no, &line_len);
+    assert(line_text != NULL);
 
     fprintf(stream, "   |\n");
     fprintf(stream, "%2u | ", line_no);
-
-    for (i = line_start; i < line_end; ++i) {
-        fputc((int)diag->file->text[i], stream);
-    }
+    fwrite(line_text, 1U, line_len, stream);
     fputc('\n', stream);
 
     underline_column = diag->span.start.column;
-
-    // Determine the width of the underline
-    // If the span covers multiple columns on the same line, underline all of them
-    // Otherwise, underline at least one character
     if (diag->span.end.line == diag->span.start.line &&
         diag->span.end.column > diag->span.start.column) {
         underline_width = diag->span.end.column - diag->span.start.column;
@@ -157,6 +110,7 @@ static void beet_emit_source_line(
     if (underline_column > 1U) {
         beet_print_repeat(stream, ' ', underline_column - 1U);
     }
+
     if (options.use_color) {
         fputs(beet_level_color(diag->level), stream);
         beet_print_repeat(stream, '^', underline_width);
@@ -164,6 +118,7 @@ static void beet_emit_source_line(
     } else {
         beet_print_repeat(stream, '^', underline_width);
     }
+
     fputc('\n', stream);
 }
 
@@ -191,6 +146,8 @@ void beet_diag_emit(
     assert(stream != NULL);
     assert(diag != NULL);
     assert(diag->file != NULL);
+    assert(diag->file->path != NULL);
+    assert(diag->file->text != NULL);
     assert(diag->message != NULL);
 
     beet_emit_header(stream, diag, options);

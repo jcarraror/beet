@@ -58,6 +58,12 @@ add_executable(test_diag_print
 )
 target_link_libraries(test_diag_print PRIVATE beet_compiler_support)
 
+add_executable(test_source_file
+    tests/source_file.c
+)
+target_link_libraries(test_source_file PRIVATE beet_compiler_support)
+
 add_test(NAME smoke_compiler COMMAND test_smoke_compiler)
 add_test(NAME smoke_vm COMMAND test_smoke_vm)
 add_test(NAME diag_print COMMAND test_diag_print)
+add_test(NAME source_file COMMAND test_source_file)
