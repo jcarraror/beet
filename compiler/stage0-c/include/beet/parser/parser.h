@@ -11,10 +11,8 @@ typedef struct beet_parser {
 
 void beet_parser_init(beet_parser *parser, const beet_source_file *file);
 
-/* returns 1 if a binding was parsed, 0 otherwise */
 int beet_parser_parse_binding(beet_parser *parser, beet_ast_binding *out);
-
-/* returns 1 if a function was parsed, 0 otherwise */
 int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out);
+int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out);
 
 #endif

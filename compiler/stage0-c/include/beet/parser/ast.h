@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #define BEET_AST_MAX_PARAMS 16
+#define BEET_AST_MAX_FIELDS 32
 
 typedef struct beet_ast_binding {
     const char *name;
@@ -29,5 +30,18 @@ typedef struct beet_ast_function {
     beet_ast_param params[BEET_AST_MAX_PARAMS];
     size_t param_count;
 } beet_ast_function;
+
+typedef struct beet_ast_field {
+    const char *name;
+    const char *type_name;
+} beet_ast_field;
+
+typedef struct beet_ast_type_decl {
+    const char *name;
+    int is_structure;
+
+    beet_ast_field fields[BEET_AST_MAX_FIELDS];
+    size_t field_count;
+} beet_ast_type_decl;
 
 #endif

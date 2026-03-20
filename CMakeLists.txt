@@ -80,6 +80,11 @@ add_executable(test_parser_function
 )
 target_link_libraries(test_parser_function PRIVATE beet_compiler_support)
 
+add_executable(test_parser_type_decl
+    tests/parser_type_decl.c
+)
+target_link_libraries(test_parser_type_decl PRIVATE beet_compiler_support)
+
 add_test(NAME smoke_compiler COMMAND test_smoke_compiler)
 add_test(NAME smoke_vm COMMAND test_smoke_vm)
 add_test(NAME diag_print COMMAND test_diag_print)
@@ -87,3 +92,4 @@ add_test(NAME source_file COMMAND test_source_file)
 add_test(NAME lexer_tokens COMMAND test_lexer_tokens)
 add_test(NAME parser_binding COMMAND test_parser_binding)
 add_test(NAME parser_function COMMAND test_parser_function)
+add_test(NAME parser_type_decl COMMAND test_parser_type_decl)
