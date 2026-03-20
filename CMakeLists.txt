@@ -164,3 +164,13 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "10"
 )
+
+add_test(
+    NAME driver_return_arithmetic
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_arithmetic.beet
+)
+set_tests_properties(
+    driver_return_arithmetic
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "-3"
+)
