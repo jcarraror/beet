@@ -24,8 +24,11 @@ static void test_empty_function(void) {
   assert(function_ast.return_type_name_len == 3U);
   assert(strncmp(function_ast.return_type_name, "Int", 3) == 0);
   assert(function_ast.param_count == 0U);
-  assert(function_ast.has_trivial_return_const_int);
-  assert(function_ast.trivial_return_const_int == 0);
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(function_ast.body[0].expr.text_len == 1U);
+  assert(strncmp(function_ast.body[0].expr.text, "0", 1) == 0);
 
   beet_source_file_dispose(&file);
 }
@@ -58,18 +61,18 @@ static void test_function_with_params(void) {
   assert(strncmp(function_ast.params[1].name, "scale", 5) == 0);
   assert(strncmp(function_ast.params[1].type_name, "Int", 3) == 0);
 
-  assert(function_ast.has_trivial_return_const_int);
-  assert(function_ast.trivial_return_const_int == 7);
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(function_ast.body[0].expr.text_len == 1U);
+  assert(strncmp(function_ast.body[0].expr.text, "7", 1) == 0);
 
   beet_source_file_dispose(&file);
 }
 
-static void test_nested_block_function(void) {
-  const char *text = "function abs(x is Int) returns Int {\n"
-                     "    if x {\n"
-                     "        return x\n"
-                     "    }\n"
-                     "    return 0\n"
+static void test_name_return_function(void) {
+  const char *text = "function identity(x is Int) returns Int {\n"
+                     "    return x\n"
                      "}\n";
 
   beet_source_file file;
@@ -82,10 +85,11 @@ static void test_nested_block_function(void) {
   beet_parser_init(&parser, &file);
 
   assert(beet_parser_parse_function(&parser, &function_ast));
-  assert(function_ast.name_len == 3U);
-  assert(strncmp(function_ast.name, "abs", 3) == 0);
-  assert(function_ast.param_count == 1U);
-  assert(!function_ast.has_trivial_return_const_int);
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].expr.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].expr.text_len == 1U);
+  assert(strncmp(function_ast.body[0].expr.text, "x", 1) == 0);
 
   beet_source_file_dispose(&file);
 }
@@ -93,6 +97,6 @@ static void test_nested_block_function(void) {
 int main(void) {
   test_empty_function();
   test_function_with_params();
-  test_nested_block_function();
+  test_name_return_function();
   return 0;
 }

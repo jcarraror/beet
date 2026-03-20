@@ -1,7 +1,6 @@
 #include "beet/parser/parser.h"
 
 #include <assert.h>
-#include <ctype.h>
 
 static void beet_parser_advance(beet_parser *parser) {
   parser->current = beet_lexer_next(&parser->lexer);
@@ -21,29 +20,6 @@ static int beet_expect(beet_parser *parser, beet_token_kind kind) {
   }
 
   beet_parser_advance(parser);
-  return 1;
-}
-
-static int beet_parse_int_token(const beet_token *token, int *out_value) {
-  size_t i;
-  int value;
-
-  assert(token != NULL);
-  assert(out_value != NULL);
-
-  if (token->kind != BEET_TOKEN_INT_LITERAL || token->lexeme_len == 0U) {
-    return 0;
-  }
-
-  value = 0;
-  for (i = 0U; i < token->lexeme_len; ++i) {
-    if (!isdigit((unsigned char)token->lexeme[i])) {
-      return 0;
-    }
-    value = (value * 10) + (int)(token->lexeme[i] - '0');
-  }
-
-  *out_value = value;
   return 1;
 }
 
@@ -139,26 +115,44 @@ static int beet_parser_parse_param(beet_parser *parser, beet_ast_param *out) {
   return 1;
 }
 
-static int beet_parser_skip_block(beet_parser *parser) {
-  int depth = 1;
-
+static int beet_parser_parse_expr(beet_parser *parser, beet_ast_expr *out) {
   assert(parser != NULL);
+  assert(out != NULL);
 
-  while (depth > 0) {
-    if (parser->current.kind == BEET_TOKEN_EOF) {
-      return 0;
-    }
-
-    if (parser->current.kind == BEET_TOKEN_LBRACE) {
-      depth += 1;
-    } else if (parser->current.kind == BEET_TOKEN_RBRACE) {
-      depth -= 1;
-    }
-
+  if (parser->current.kind == BEET_TOKEN_INT_LITERAL) {
+    out->kind = BEET_AST_EXPR_INT_LITERAL;
+    out->text = parser->current.lexeme;
+    out->text_len = parser->current.lexeme_len;
     beet_parser_advance(parser);
+    return 1;
   }
 
-  return 1;
+  if (parser->current.kind == BEET_TOKEN_IDENTIFIER) {
+    out->kind = BEET_AST_EXPR_NAME;
+    out->text = parser->current.lexeme;
+    out->text_len = parser->current.lexeme_len;
+    beet_parser_advance(parser);
+    return 1;
+  }
+
+  out->kind = BEET_AST_EXPR_INVALID;
+  out->text = NULL;
+  out->text_len = 0U;
+  return 0;
+}
+
+static int beet_parser_parse_stmt(beet_parser *parser, beet_ast_stmt *out) {
+  assert(parser != NULL);
+  assert(out != NULL);
+
+  if (parser->current.kind == BEET_TOKEN_KW_RETURN) {
+    out->kind = BEET_AST_STMT_RETURN;
+    beet_parser_advance(parser);
+    return beet_parser_parse_expr(parser, &out->expr);
+  }
+
+  out->kind = BEET_AST_STMT_INVALID;
+  return 0;
 }
 
 int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
@@ -178,8 +172,7 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
   out->return_type_name = NULL;
   out->return_type_name_len = 0U;
   out->param_count = 0U;
-  out->has_trivial_return_const_int = 0;
-  out->trivial_return_const_int = 0;
+  out->body_count = 0U;
 
   beet_parser_advance(parser);
 
@@ -227,28 +220,19 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
     return 0;
   }
 
-  if (parser->current.kind == BEET_TOKEN_KW_RETURN) {
-    int value;
-
-    beet_parser_advance(parser);
-
-    if (!beet_parse_int_token(&parser->current, &value)) {
+  while (parser->current.kind != BEET_TOKEN_RBRACE) {
+    if (out->body_count >= BEET_AST_MAX_BODY_STMTS) {
       return 0;
     }
 
-    out->has_trivial_return_const_int = 1;
-    out->trivial_return_const_int = value;
-
-    beet_parser_advance(parser);
-
-    if (!beet_expect(parser, BEET_TOKEN_RBRACE)) {
+    if (!beet_parser_parse_stmt(parser, &out->body[out->body_count])) {
       return 0;
     }
 
-    return 1;
+    out->body_count += 1U;
   }
 
-  if (!beet_parser_skip_block(parser)) {
+  if (!beet_expect(parser, BEET_TOKEN_RBRACE)) {
     return 0;
   }
 

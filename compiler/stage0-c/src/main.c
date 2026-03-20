@@ -17,6 +17,28 @@ static int beet_name_equals(const char *name, size_t name_len,
   return expected_len == name_len && strncmp(name, expected, name_len) == 0;
 }
 
+static int beet_parse_int_slice(const char *text, size_t text_len,
+                                int *out_value) {
+  size_t i;
+  int value;
+
+  value = 0;
+  if (text_len == 0U) {
+    return 0;
+  }
+
+  for (i = 0U; i < text_len; ++i) {
+    char ch = text[i];
+    if (ch < '0' || ch > '9') {
+      return 0;
+    }
+    value = (value * 10) + (int)(ch - '0');
+  }
+
+  *out_value = value;
+  return 1;
+}
+
 static int beet_compile_and_run_file(const char *path, int *out_result) {
   beet_source_file file;
   beet_parser parser;
@@ -24,6 +46,7 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
   beet_mir_function mir_function;
   beet_bytecode_function bytecode_function;
   beet_vm vm;
+  int return_value;
 
   beet_source_file_init(&file);
 
@@ -54,17 +77,22 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
     return 0;
   }
 
-  if (!function_ast.has_trivial_return_const_int) {
-    fprintf(stderr,
-            "error: only trivial integer returns are supported in '%s'\n",
-            path);
+  if (function_ast.body_count != 1U ||
+      function_ast.body[0].kind != BEET_AST_STMT_RETURN ||
+      function_ast.body[0].expr.kind != BEET_AST_EXPR_INT_LITERAL ||
+      !beet_parse_int_slice(function_ast.body[0].expr.text,
+                            function_ast.body[0].expr.text_len,
+                            &return_value)) {
+    fprintf(
+        stderr,
+        "error: only single integer return statements are supported in '%s'\n",
+        path);
     beet_source_file_dispose(&file);
     return 0;
   }
 
-  if (!beet_mir_lower_trivial_return_function(
-          &mir_function, &function_ast,
-          function_ast.trivial_return_const_int)) {
+  if (!beet_mir_lower_trivial_return_function(&mir_function, &function_ast,
+                                              return_value)) {
     fprintf(stderr, "error: failed to lower function to MIR\n");
     beet_source_file_dispose(&file);
     return 0;
