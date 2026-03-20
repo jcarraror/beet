@@ -184,6 +184,14 @@ const char *beet_token_kind_name(beet_token_kind kind) {
     return "dot";
   case BEET_TOKEN_EQUAL:
     return "equal";
+  case BEET_TOKEN_PLUS:
+    return "plus";
+  case BEET_TOKEN_MINUS:
+    return "minus";
+  case BEET_TOKEN_STAR:
+    return "star";
+  case BEET_TOKEN_SLASH:
+    return "slash";
   }
 
   return "unknown";
@@ -242,6 +250,14 @@ beet_token beet_lexer_next(beet_lexer *lexer) {
     return beet_make_token(lexer, BEET_TOKEN_DOT, start, lexer->offset);
   case '=':
     return beet_make_token(lexer, BEET_TOKEN_EQUAL, start, lexer->offset);
+  case '+':
+    return beet_make_token(lexer, BEET_TOKEN_PLUS, start, lexer->offset);
+  case '-':
+    return beet_make_token(lexer, BEET_TOKEN_MINUS, start, lexer->offset);
+  case '*':
+    return beet_make_token(lexer, BEET_TOKEN_STAR, start, lexer->offset);
+  case '/':
+    return beet_make_token(lexer, BEET_TOKEN_SLASH, start, lexer->offset);
   default:
     return beet_make_token(lexer, BEET_TOKEN_ERROR, start, lexer->offset);
   }

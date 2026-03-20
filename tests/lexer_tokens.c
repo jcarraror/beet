@@ -126,10 +126,39 @@ static void test_unknown_character_yields_error(void) {
                sizeof(expected) / sizeof(expected[0]));
 }
 
+static void test_arithmetic_operator_tokens(void) {
+  static const char *text = "function main() returns Int {\n"
+                            "    return -1 + 2 * 3 / 4\n"
+                            "}\n";
+
+  static const expected_token expected[] = {
+      {BEET_TOKEN_KW_FUNCTION, "function"},
+      {BEET_TOKEN_IDENTIFIER, "main"},
+      {BEET_TOKEN_LPAREN, "("},
+      {BEET_TOKEN_RPAREN, ")"},
+      {BEET_TOKEN_KW_RETURNS, "returns"},
+      {BEET_TOKEN_IDENTIFIER, "Int"},
+      {BEET_TOKEN_LBRACE, "{"},
+      {BEET_TOKEN_KW_RETURN, "return"},
+      {BEET_TOKEN_MINUS, "-"},
+      {BEET_TOKEN_INT_LITERAL, "1"},
+      {BEET_TOKEN_PLUS, "+"},
+      {BEET_TOKEN_INT_LITERAL, "2"},
+      {BEET_TOKEN_STAR, "*"},
+      {BEET_TOKEN_INT_LITERAL, "3"},
+      {BEET_TOKEN_SLASH, "/"},
+      {BEET_TOKEN_INT_LITERAL, "4"},
+      {BEET_TOKEN_RBRACE, "}"}};
+
+  check_tokens("arithmetic_tokens.beet", text, expected,
+               sizeof(expected) / sizeof(expected[0]));
+}
+
 int main(void) {
   test_binding_and_function_tokens();
   test_type_and_structure_tokens();
   test_choice_and_construction_tokens();
   test_unknown_character_yields_error();
+  test_arithmetic_operator_tokens();
   return 0;
 }

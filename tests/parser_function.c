@@ -139,10 +139,71 @@ static void test_function_body_bindings(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_expression_precedence_function(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    return 1 + 2 * 3\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].expr.kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[0].expr.binary_op == BEET_AST_BINARY_ADD);
+  assert(function_ast.body[0].expr.left != NULL);
+  assert(function_ast.body[0].expr.left->kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[0].expr.left->text, "1", 1) == 0);
+  assert(function_ast.body[0].expr.right != NULL);
+  assert(function_ast.body[0].expr.right->kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[0].expr.right->binary_op == BEET_AST_BINARY_MUL);
+  assert(function_ast.body[0].expr.right->left != NULL);
+  assert(strncmp(function_ast.body[0].expr.right->left->text, "2", 1) == 0);
+  assert(function_ast.body[0].expr.right->right != NULL);
+  assert(strncmp(function_ast.body[0].expr.right->right->text, "3", 1) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_unary_and_grouped_expression_function(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    return -(1 + 2)\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].expr.kind == BEET_AST_EXPR_UNARY);
+  assert(function_ast.body[0].expr.unary_op == BEET_AST_UNARY_NEGATE);
+  assert(function_ast.body[0].expr.left != NULL);
+  assert(function_ast.body[0].expr.left->kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[0].expr.left->binary_op == BEET_AST_BINARY_ADD);
+  assert(function_ast.body[0].expr.left->left != NULL);
+  assert(strncmp(function_ast.body[0].expr.left->left->text, "1", 1) == 0);
+  assert(function_ast.body[0].expr.left->right != NULL);
+  assert(strncmp(function_ast.body[0].expr.left->right->text, "2", 1) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_empty_function();
   test_function_with_params();
   test_name_return_function();
   test_function_body_bindings();
+  test_expression_precedence_function();
+  test_unary_and_grouped_expression_function();
   return 0;
 }

@@ -6,12 +6,24 @@
 #define BEET_AST_MAX_PARAMS 16
 #define BEET_AST_MAX_FIELDS 32
 #define BEET_AST_MAX_BODY_STMTS 64
+#define BEET_AST_MAX_EXPR_NODES 128
 
 typedef enum beet_ast_expr_kind {
   BEET_AST_EXPR_INVALID = 0,
   BEET_AST_EXPR_INT_LITERAL,
-  BEET_AST_EXPR_NAME
+  BEET_AST_EXPR_NAME,
+  BEET_AST_EXPR_UNARY,
+  BEET_AST_EXPR_BINARY
 } beet_ast_expr_kind;
+
+typedef enum beet_ast_unary_op { BEET_AST_UNARY_NEGATE = 0 } beet_ast_unary_op;
+
+typedef enum beet_ast_binary_op {
+  BEET_AST_BINARY_ADD = 0,
+  BEET_AST_BINARY_SUB,
+  BEET_AST_BINARY_MUL,
+  BEET_AST_BINARY_DIV
+} beet_ast_binary_op;
 
 typedef struct beet_ast_expr {
   beet_ast_expr_kind kind;
@@ -21,6 +33,11 @@ typedef struct beet_ast_expr {
   int is_resolved;
   size_t resolved_depth;
   int resolved_is_mutable;
+
+  beet_ast_unary_op unary_op;
+  beet_ast_binary_op binary_op;
+  struct beet_ast_expr *left;
+  struct beet_ast_expr *right;
 } beet_ast_expr;
 
 typedef struct beet_ast_binding {
@@ -69,6 +86,9 @@ typedef struct beet_ast_function {
 
   beet_ast_stmt body[BEET_AST_MAX_BODY_STMTS];
   size_t body_count;
+
+  beet_ast_expr expr_nodes[BEET_AST_MAX_EXPR_NODES];
+  size_t expr_count;
 } beet_ast_function;
 
 typedef struct beet_ast_field {

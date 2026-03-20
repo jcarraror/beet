@@ -33,7 +33,11 @@ typedef enum beet_token_kind {
   BEET_TOKEN_RBRACE,
   BEET_TOKEN_COMMA,
   BEET_TOKEN_DOT,
-  BEET_TOKEN_EQUAL
+  BEET_TOKEN_EQUAL,
+  BEET_TOKEN_PLUS,
+  BEET_TOKEN_MINUS,
+  BEET_TOKEN_STAR,
+  BEET_TOKEN_SLASH
 } beet_token_kind;
 
 typedef struct beet_token {
