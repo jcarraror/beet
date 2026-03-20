@@ -154,3 +154,13 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "7"
 )
+
+add_test(
+    NAME driver_return_bound_local
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_bound_local.beet
+)
+set_tests_properties(
+    driver_return_bound_local
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "10"
+)

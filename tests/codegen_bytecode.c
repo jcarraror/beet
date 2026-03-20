@@ -4,6 +4,7 @@
 #include "beet/codegen/codegen.h"
 #include "beet/mir/mir.h"
 #include "beet/parser/parser.h"
+#include "beet/resolve/scope.h"
 #include "beet/support/source.h"
 #include "beet/vm/bytecode.h"
 
@@ -90,9 +91,43 @@ static void test_codegen_return_local(void) {
   assert(bytecode_function.code[7] == 0);
 }
 
+static void test_codegen_lowered_function_return_local(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind x = 10\n"
+                     "    return x\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+  assert(beet_codegen_function(&mir_function, &bytecode_function));
+
+  assert(bytecode_function.code_count == 8U);
+  assert(bytecode_function.code[0] == BEET_BC_OP_CONST_INT);
+  assert(bytecode_function.code[1] == 0);
+  assert(bytecode_function.code[2] == 10);
+  assert(bytecode_function.code[3] == BEET_BC_OP_STORE_LOCAL);
+  assert(bytecode_function.code[4] == 0);
+  assert(bytecode_function.code[5] == 0);
+  assert(bytecode_function.code[6] == BEET_BC_OP_RETURN_LOCAL);
+  assert(bytecode_function.code[7] == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_codegen_binding();
   test_codegen_return_const();
   test_codegen_return_local();
+  test_codegen_lowered_function_return_local();
   return 0;
 }
