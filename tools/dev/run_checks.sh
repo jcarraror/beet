@@ -7,6 +7,8 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 had_format_changes=0
+tmp_files="$(mktemp)"
+trap 'rm -f "$tmp_files"' EXIT HUP INT TERM
 
 say() {
     printf '%s\n' "$*"
@@ -16,50 +18,30 @@ have_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
-tracked_files() {
-    git ls-files
-}
-
-format_file() {
-    file="$1"
-
-    case "$file" in
-        *.c|*.h)
-            if have_cmd clang-format; then
-                clang-format -i "$file"
-            fi
-            ;;
-        *)
-            ;;
-    esac
-}
-
-format_project() {
+format_tracked_files() {
     if ! have_cmd clang-format; then
-        say "[beet] clang-format not found; skipping auto-format"
+        say "[beet] clang-format not found; skipping formatting"
         return 0
     fi
 
-    say "[beet] formatting project files"
+    say "[beet] formatting tracked C/C header files"
 
-    for file in $(tracked_files); do
-        if [ ! -f "$file" ]; then
-            continue
+    git ls-files '*.c' '*.h' > "$tmp_files"
+
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+        [ -f "$file" ] || continue
+
+        before="$(git hash-object "$file")"
+        clang-format -i "$file"
+        after="$(git hash-object "$file")"
+
+        if [ "$before" != "$after" ]; then
+            git add "$file"
+            had_format_changes=1
+            say "[beet] formatted: $file"
         fi
-
-        case "$file" in
-            *.c|*.h)
-                before="$(git hash-object "$file" 2>/dev/null || true)"
-                format_file "$file"
-                after="$(git hash-object "$file" 2>/dev/null || true)"
-
-                if [ "$before" != "$after" ]; then
-                    had_format_changes=1
-                    say "[beet] formatted: $file"
-                fi
-                ;;
-        esac
-    done
+    done < "$tmp_files"
 }
 
 configure_build_test() {
@@ -73,14 +55,15 @@ configure_build_test() {
     ctest --test-dir build --output-on-failure
 }
 
-format_project
-configure_build_test
+format_tracked_files
 
 if [ "${MODE}" = "--hook" ] && [ "$had_format_changes" -eq 1 ]; then
     say
-    say "[beet] some files were auto-formatted"
-    say "[beet] review the changes, stage them, and run git commit again"
+    say "[beet] formatting changed files"
+    say "[beet] changes were re-staged"
+    say "[beet] review them and run git commit again"
     exit 1
 fi
 
+configure_build_test
 say "[beet] checks passed"
