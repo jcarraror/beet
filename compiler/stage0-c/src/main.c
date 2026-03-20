@@ -5,6 +5,7 @@
 #include "beet/compiler/api.h"
 #include "beet/mir/mir.h"
 #include "beet/parser/parser.h"
+#include "beet/resolve/scope.h"
 #include "beet/support/source.h"
 #include "beet/types/check.h"
 #include "beet/vm/interpreter.h"
@@ -50,6 +51,12 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
 
   if (!beet_type_check_function_signature(&function_ast)) {
     fprintf(stderr, "error: invalid function signature in '%s'\n", path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!beet_resolve_function(&function_ast)) {
+    fprintf(stderr, "error: failed to resolve function names in '%s'\n", path);
     beet_source_file_dispose(&file);
     return 0;
   }

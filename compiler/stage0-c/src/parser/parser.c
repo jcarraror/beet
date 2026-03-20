@@ -123,6 +123,9 @@ static int beet_parser_parse_expr(beet_parser *parser, beet_ast_expr *out) {
     out->kind = BEET_AST_EXPR_INT_LITERAL;
     out->text = parser->current.lexeme;
     out->text_len = parser->current.lexeme_len;
+    out->is_resolved = 0;
+    out->resolved_depth = 0U;
+    out->resolved_is_mutable = 0;
     beet_parser_advance(parser);
     return 1;
   }
@@ -131,6 +134,9 @@ static int beet_parser_parse_expr(beet_parser *parser, beet_ast_expr *out) {
     out->kind = BEET_AST_EXPR_NAME;
     out->text = parser->current.lexeme;
     out->text_len = parser->current.lexeme_len;
+    out->is_resolved = 0;
+    out->resolved_depth = 0U;
+    out->resolved_is_mutable = 0;
     beet_parser_advance(parser);
     return 1;
   }
@@ -138,6 +144,9 @@ static int beet_parser_parse_expr(beet_parser *parser, beet_ast_expr *out) {
   out->kind = BEET_AST_EXPR_INVALID;
   out->text = NULL;
   out->text_len = 0U;
+  out->is_resolved = 0;
+  out->resolved_depth = 0U;
+  out->resolved_is_mutable = 0;
   return 0;
 }
 

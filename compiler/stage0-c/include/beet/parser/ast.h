@@ -17,6 +17,10 @@ typedef struct beet_ast_expr {
   beet_ast_expr_kind kind;
   const char *text;
   size_t text_len;
+
+  int is_resolved;
+  size_t resolved_depth;
+  int resolved_is_mutable;
 } beet_ast_expr;
 
 typedef struct beet_ast_binding {

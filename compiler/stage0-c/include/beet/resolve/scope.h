@@ -3,11 +3,14 @@
 
 #include <stddef.h>
 
+#include "beet/parser/ast.h"
+
 #define BEET_SCOPE_MAX_SYMBOLS 256
 #define BEET_SCOPE_MAX_STACK 32
 
 typedef struct beet_symbol {
   const char *name;
+  size_t name_len;
   size_t depth;
   int is_mutable;
 } beet_symbol;
@@ -26,8 +29,14 @@ int beet_scope_enter(beet_scope_stack *stack);
 int beet_scope_leave(beet_scope_stack *stack);
 
 int beet_scope_bind(beet_scope_stack *stack, const char *name, int is_mutable);
+int beet_scope_bind_slice(beet_scope_stack *stack, const char *name,
+                          size_t name_len, int is_mutable);
 
 const beet_symbol *beet_scope_lookup(const beet_scope_stack *stack,
                                      const char *name);
+const beet_symbol *beet_scope_lookup_slice(const beet_scope_stack *stack,
+                                           const char *name, size_t name_len);
+
+int beet_resolve_function(beet_ast_function *function_ast);
 
 #endif
