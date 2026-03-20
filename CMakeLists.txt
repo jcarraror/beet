@@ -23,6 +23,7 @@ add_library(beet_compiler_support
     compiler/stage0-c/src/resolve/scope.c
     compiler/stage0-c/src/types/types.c
     compiler/stage0-c/src/types/check.c
+    compiler/stage0-c/src/mir/mir.c
 )
 target_include_directories(beet_compiler_support
     PUBLIC
@@ -98,6 +99,11 @@ add_executable(test_types_check
 )
 target_link_libraries(test_types_check PRIVATE beet_compiler_support)
 
+add_executable(test_mir_lowering
+    tests/mir_lowering.c
+)
+target_link_libraries(test_mir_lowering PRIVATE beet_compiler_support)
+
 add_test(NAME smoke_compiler COMMAND test_smoke_compiler)
 add_test(NAME smoke_vm COMMAND test_smoke_vm)
 add_test(NAME diag_print COMMAND test_diag_print)
@@ -108,3 +114,4 @@ add_test(NAME parser_function COMMAND test_parser_function)
 add_test(NAME parser_type_decl COMMAND test_parser_type_decl)
 add_test(NAME resolve_scope COMMAND test_resolve_scope)
 add_test(NAME types_check COMMAND test_types_check)
+add_test(NAME mir_lowering COMMAND test_mir_lowering)
