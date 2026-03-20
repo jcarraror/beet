@@ -19,9 +19,13 @@ static void test_empty_function(void) {
   beet_parser_init(&parser, &file);
 
   assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.name_len == 4U);
   assert(strncmp(function_ast.name, "main", 4) == 0);
+  assert(function_ast.return_type_name_len == 3U);
   assert(strncmp(function_ast.return_type_name, "Int", 3) == 0);
   assert(function_ast.param_count == 0U);
+  assert(function_ast.has_trivial_return_const_int);
+  assert(function_ast.trivial_return_const_int == 0);
 
   beet_source_file_dispose(&file);
 }
@@ -29,7 +33,7 @@ static void test_empty_function(void) {
 static void test_function_with_params(void) {
   const char *text =
       "function length(point is Point, scale is Int) returns Int {\n"
-      "    return scale\n"
+      "    return 7\n"
       "}\n";
 
   beet_source_file file;
@@ -42,7 +46,9 @@ static void test_function_with_params(void) {
   beet_parser_init(&parser, &file);
 
   assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.name_len == 6U);
   assert(strncmp(function_ast.name, "length", 6) == 0);
+  assert(function_ast.return_type_name_len == 3U);
   assert(strncmp(function_ast.return_type_name, "Int", 3) == 0);
   assert(function_ast.param_count == 2U);
 
@@ -51,6 +57,9 @@ static void test_function_with_params(void) {
 
   assert(strncmp(function_ast.params[1].name, "scale", 5) == 0);
   assert(strncmp(function_ast.params[1].type_name, "Int", 3) == 0);
+
+  assert(function_ast.has_trivial_return_const_int);
+  assert(function_ast.trivial_return_const_int == 7);
 
   beet_source_file_dispose(&file);
 }
@@ -73,8 +82,10 @@ static void test_nested_block_function(void) {
   beet_parser_init(&parser, &file);
 
   assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.name_len == 3U);
   assert(strncmp(function_ast.name, "abs", 3) == 0);
   assert(function_ast.param_count == 1U);
+  assert(!function_ast.has_trivial_return_const_int);
 
   beet_source_file_dispose(&file);
 }

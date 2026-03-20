@@ -1,49 +1,103 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
+#include "beet/codegen/codegen.h"
 #include "beet/compiler/api.h"
-#include "beet/lexer/lexer.h"
-#include "beet/lexer/token.h"
+#include "beet/mir/mir.h"
+#include "beet/parser/parser.h"
 #include "beet/support/source.h"
+#include "beet/types/check.h"
+#include "beet/vm/interpreter.h"
 
-static void beet_dump_tokens(const beet_source_file *file) {
-  beet_lexer lexer;
-  beet_token token;
+static int beet_name_equals(const char *name, size_t name_len,
+                            const char *expected) {
+  size_t expected_len;
 
-  beet_lexer_init(&lexer, file);
-
-  do {
-    token = beet_lexer_next(&lexer);
-    printf("%s [%u:%u..%u:%u] \"%.*s\"\n", beet_token_kind_name(token.kind),
-           token.span.start.line, token.span.start.column, token.span.end.line,
-           token.span.end.column, (int)token.lexeme_len, token.lexeme);
-  } while (token.kind != BEET_TOKEN_EOF);
+  expected_len = strlen(expected);
+  return expected_len == name_len && strncmp(name, expected, name_len) == 0;
 }
 
-int main(void) {
-  const char *text = "type Point = structure {\n"
-                     "    x is Int\n"
-                     "    y is Int\n"
-                     "}\n"
-                     "\n"
-                     "function main() returns Int {\n"
-                     "    bind point = Point(x = 3, y = 4)\n"
-                     "    mutable total = 0\n"
-                     "    return 0\n"
-                     "}\n";
-
+static int beet_compile_and_run_file(const char *path, int *out_result) {
   beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+  beet_vm vm;
 
   beet_source_file_init(&file);
 
-  if (!beet_source_file_set_text_copy(&file, "demo.beet", text)) {
-    fputs("failed to initialize source file\n", stderr);
+  if (!beet_source_file_load(&file, path)) {
+    fprintf(stderr, "error: failed to load source file '%s'\n", path);
+    return 0;
+  }
+
+  beet_parser_init(&parser, &file);
+
+  if (!beet_parser_parse_function(&parser, &function_ast)) {
+    fprintf(stderr, "error: failed to parse top-level function in '%s'\n",
+            path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!beet_name_equals(function_ast.name, function_ast.name_len, "main")) {
+    fprintf(stderr, "error: expected top-level function 'main' in '%s'\n",
+            path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!beet_type_check_function_signature(&function_ast)) {
+    fprintf(stderr, "error: invalid function signature in '%s'\n", path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!function_ast.has_trivial_return_const_int) {
+    fprintf(stderr,
+            "error: only trivial integer returns are supported in '%s'\n",
+            path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!beet_mir_lower_trivial_return_function(
+          &mir_function, &function_ast,
+          function_ast.trivial_return_const_int)) {
+    fprintf(stderr, "error: failed to lower function to MIR\n");
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!beet_codegen_function(&mir_function, &bytecode_function)) {
+    fprintf(stderr, "error: failed to generate bytecode\n");
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!beet_vm_execute(&vm, &bytecode_function, out_result)) {
+    fprintf(stderr, "error: VM execution failed\n");
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  beet_source_file_dispose(&file);
+  return 1;
+}
+
+int main(int argc, char **argv) {
+  int result;
+
+  if (argc != 2) {
+    fprintf(stderr, "%s: usage: %s <file.beet>\n", BEET_COMPILER_NAME, argv[0]);
     return 1;
   }
 
-  puts(BEET_COMPILER_NAME ": stage0 compiler bootstrap");
-  beet_dump_tokens(&file);
+  if (!beet_compile_and_run_file(argv[1], &result)) {
+    return 1;
+  }
 
-  beet_source_file_dispose(&file);
+  printf("%d\n", result);
   return 0;
 }

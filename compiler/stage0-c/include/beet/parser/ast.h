@@ -13,7 +13,7 @@ typedef struct beet_ast_binding {
   int is_mutable;
   int has_type;
 
-  const char *type_name; /* optional */
+  const char *type_name;
   size_t type_name_len;
 
   const char *value_text;
@@ -37,6 +37,9 @@ typedef struct beet_ast_function {
 
   beet_ast_param params[BEET_AST_MAX_PARAMS];
   size_t param_count;
+
+  int has_trivial_return_const_int;
+  int trivial_return_const_int;
 } beet_ast_function;
 
 typedef struct beet_ast_field {

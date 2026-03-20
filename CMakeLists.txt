@@ -134,3 +134,23 @@ add_test(NAME types_check COMMAND test_types_check)
 add_test(NAME mir_lowering COMMAND test_mir_lowering)
 add_test(NAME codegen_bytecode COMMAND test_codegen_bytecode)
 add_test(NAME vm_execution COMMAND test_vm_execution)
+
+add_test(
+    NAME driver_return_zero
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_zero.beet
+)
+set_tests_properties(
+    driver_return_zero
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "0"
+)
+
+add_test(
+    NAME driver_return_seven
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_seven.beet
+)
+set_tests_properties(
+    driver_return_seven
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "7"
+)
