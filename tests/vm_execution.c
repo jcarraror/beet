@@ -9,7 +9,7 @@ static void test_return_const(void) {
   int result;
 
   beet_bytecode_function_init(&fn);
-  assert(beet_bytecode_emit_return_const_int(&fn, 42));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 42));
 
   assert(beet_vm_execute(&vm, &fn, &result));
   assert(result == 42);
@@ -22,9 +22,9 @@ static void test_store_and_return_local(void) {
 
   beet_bytecode_function_init(&fn);
 
-  assert(beet_bytecode_emit_const_int(&fn, 0, 10));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 0, 10));
   assert(beet_bytecode_emit_store_local(&fn, 0, 0));
-  assert(beet_bytecode_emit_return_local(&fn, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_LOCAL, 0));
 
   assert(beet_vm_execute(&vm, &fn, &result));
   assert(result == 10);
@@ -37,10 +37,10 @@ static void test_multiple_values(void) {
 
   beet_bytecode_function_init(&fn);
 
-  assert(beet_bytecode_emit_const_int(&fn, 0, 5));
-  assert(beet_bytecode_emit_const_int(&fn, 1, 7));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 0, 5));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 1, 7));
   assert(beet_bytecode_emit_store_local(&fn, 0, 1));
-  assert(beet_bytecode_emit_return_local(&fn, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_LOCAL, 0));
 
   assert(beet_vm_execute(&vm, &fn, &result));
   assert(result == 7);

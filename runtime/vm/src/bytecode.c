@@ -2,8 +2,22 @@
 
 #include <assert.h>
 
-static int beet_bytecode_emit3(beet_bytecode_function *function, int a, int b,
-                               int c) {
+int beet_bytecode_emit4(beet_bytecode_function *function, int a, int b, int c,
+                        int d) {
+  assert(function != NULL);
+
+  if (function->code_count + 4U > BEET_BC_MAX_CODE) {
+    return 0;
+  }
+
+  function->code[function->code_count++] = a;
+  function->code[function->code_count++] = b;
+  function->code[function->code_count++] = c;
+  function->code[function->code_count++] = d;
+  return 1;
+}
+
+int beet_bytecode_emit3(beet_bytecode_function *function, int a, int b, int c) {
   assert(function != NULL);
 
   if (function->code_count + 3U > BEET_BC_MAX_CODE) {
@@ -16,7 +30,7 @@ static int beet_bytecode_emit3(beet_bytecode_function *function, int a, int b,
   return 1;
 }
 
-static int beet_bytecode_emit2(beet_bytecode_function *function, int a, int b) {
+int beet_bytecode_emit2(beet_bytecode_function *function, int a, int b) {
   assert(function != NULL);
 
   if (function->code_count + 2U > BEET_BC_MAX_CODE) {
@@ -35,11 +49,6 @@ void beet_bytecode_function_init(beet_bytecode_function *function) {
   function->local_count = 0U;
 }
 
-int beet_bytecode_emit_const_int(beet_bytecode_function *function, int dst,
-                                 int value) {
-  return beet_bytecode_emit3(function, BEET_BC_OP_CONST_INT, dst, value);
-}
-
 int beet_bytecode_emit_store_local(beet_bytecode_function *function,
                                    int local_index, int src_temp) {
   if ((size_t)(local_index + 1) > function->local_count) {
@@ -50,12 +59,13 @@ int beet_bytecode_emit_store_local(beet_bytecode_function *function,
                              src_temp);
 }
 
-int beet_bytecode_emit_return_local(beet_bytecode_function *function,
-                                    int local_index) {
-  return beet_bytecode_emit2(function, BEET_BC_OP_RETURN_LOCAL, local_index);
-}
+int beet_bytecode_emit_binary_int(beet_bytecode_function *function,
+                                  beet_bc_opcode opcode, int dst_temp,
+                                  int lhs_temp, int rhs_temp) {
+  if (opcode != BEET_BC_OP_ADD_INT && opcode != BEET_BC_OP_SUB_INT &&
+      opcode != BEET_BC_OP_MUL_INT && opcode != BEET_BC_OP_DIV_INT) {
+    return 0;
+  }
 
-int beet_bytecode_emit_return_const_int(beet_bytecode_function *function,
-                                        int value) {
-  return beet_bytecode_emit2(function, BEET_BC_OP_RETURN_CONST_INT, value);
+  return beet_bytecode_emit4(function, opcode, dst_temp, lhs_temp, rhs_temp);
 }

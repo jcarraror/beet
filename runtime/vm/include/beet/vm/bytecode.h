@@ -8,8 +8,14 @@
 typedef enum beet_bc_opcode {
   BEET_BC_OP_CONST_INT = 1,
   BEET_BC_OP_STORE_LOCAL = 2,
-  BEET_BC_OP_RETURN_LOCAL = 3,
-  BEET_BC_OP_RETURN_CONST_INT = 4
+  BEET_BC_OP_LOAD_LOCAL = 3,
+  BEET_BC_OP_ADD_INT = 4,
+  BEET_BC_OP_SUB_INT = 5,
+  BEET_BC_OP_MUL_INT = 6,
+  BEET_BC_OP_DIV_INT = 7,
+  BEET_BC_OP_RETURN_LOCAL = 8,
+  BEET_BC_OP_RETURN_TEMP = 9,
+  BEET_BC_OP_RETURN_CONST_INT = 10
 } beet_bc_opcode;
 
 typedef struct beet_bytecode_function {
@@ -20,16 +26,16 @@ typedef struct beet_bytecode_function {
 
 void beet_bytecode_function_init(beet_bytecode_function *function);
 
-int beet_bytecode_emit_const_int(beet_bytecode_function *function, int dst,
-                                 int value);
+int beet_bytecode_emit2(beet_bytecode_function *function, int a, int b);
+int beet_bytecode_emit3(beet_bytecode_function *function, int a, int b, int c);
+int beet_bytecode_emit4(beet_bytecode_function *function, int a, int b, int c,
+                        int d);
 
 int beet_bytecode_emit_store_local(beet_bytecode_function *function,
                                    int local_index, int src_temp);
 
-int beet_bytecode_emit_return_local(beet_bytecode_function *function,
-                                    int local_index);
-
-int beet_bytecode_emit_return_const_int(beet_bytecode_function *function,
-                                        int value);
+int beet_bytecode_emit_binary_int(beet_bytecode_function *function,
+                                  beet_bc_opcode opcode, int dst_temp,
+                                  int lhs_temp, int rhs_temp);
 
 #endif

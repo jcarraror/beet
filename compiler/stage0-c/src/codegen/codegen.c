@@ -33,8 +33,8 @@ int beet_codegen_function(const beet_mir_function *mir_function,
 
     switch (instr->op) {
     case BEET_MIR_OP_CONST_INT:
-      if (!beet_bytecode_emit_const_int(bytecode_function, instr->dst,
-                                        instr->int_value)) {
+      if (!beet_bytecode_emit3(bytecode_function, BEET_BC_OP_CONST_INT,
+                               instr->dst, instr->int_value)) {
         return 0;
       }
       break;
@@ -52,21 +52,74 @@ int beet_codegen_function(const beet_mir_function *mir_function,
       break;
     }
 
+    case BEET_MIR_OP_LOAD_LOCAL: {
+      int local_index = beet_find_local_index(mir_function, instr->name);
+      if (local_index < 0) {
+        return 0;
+      }
+
+      if (!beet_bytecode_emit3(bytecode_function, BEET_BC_OP_LOAD_LOCAL,
+                               instr->dst, local_index)) {
+        return 0;
+      }
+      break;
+    }
+
+    case BEET_MIR_OP_ADD_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_ADD_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_SUB_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_SUB_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_MUL_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_MUL_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_DIV_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_DIV_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
     case BEET_MIR_OP_RETURN_LOCAL: {
       int local_index = beet_find_local_index(mir_function, instr->name);
       if (local_index < 0) {
         return 0;
       }
 
-      if (!beet_bytecode_emit_return_local(bytecode_function, local_index)) {
+      if (!beet_bytecode_emit2(bytecode_function, BEET_BC_OP_RETURN_LOCAL,
+                               local_index)) {
         return 0;
       }
       break;
     }
 
+    case BEET_MIR_OP_RETURN_TEMP:
+      if (!beet_bytecode_emit2(bytecode_function, BEET_BC_OP_RETURN_TEMP,
+                               instr->dst)) {
+        return 0;
+      }
+      break;
+
     case BEET_MIR_OP_RETURN_CONST_INT:
-      if (!beet_bytecode_emit_return_const_int(bytecode_function,
-                                               instr->int_value)) {
+      if (!beet_bytecode_emit2(bytecode_function, BEET_BC_OP_RETURN_CONST_INT,
+                               instr->int_value)) {
         return 0;
       }
       break;
