@@ -135,6 +135,56 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr) {
   }
 }
 
+static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
+                                  size_t stmt_count) {
+  size_t i;
+
+  assert(stack != NULL);
+  assert(stmts != NULL || stmt_count == 0U);
+
+  for (i = 0U; i < stmt_count; ++i) {
+    beet_ast_stmt *stmt = &stmts[i];
+
+    switch (stmt->kind) {
+    case BEET_AST_STMT_BINDING:
+      if (!beet_scope_bind_slice(stack, stmt->binding.name,
+                                 stmt->binding.name_len,
+                                 stmt->binding.is_mutable)) {
+        return 0;
+      }
+      break;
+
+    case BEET_AST_STMT_RETURN:
+      if (!beet_resolve_expr(stack, &stmt->expr)) {
+        return 0;
+      }
+      break;
+
+    case BEET_AST_STMT_IF:
+      if (!beet_resolve_expr(stack, &stmt->condition)) {
+        return 0;
+      }
+      if (!beet_scope_enter(stack)) {
+        return 0;
+      }
+      if (!beet_resolve_stmt_list(stack, stmt->then_body,
+                                  stmt->then_body_count)) {
+        (void)beet_scope_leave(stack);
+        return 0;
+      }
+      if (!beet_scope_leave(stack)) {
+        return 0;
+      }
+      break;
+
+    default:
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 int beet_resolve_function(beet_ast_function *function_ast) {
   beet_scope_stack stack;
   size_t i;
@@ -151,28 +201,6 @@ int beet_resolve_function(beet_ast_function *function_ast) {
     }
   }
 
-  for (i = 0U; i < function_ast->body_count; ++i) {
-    beet_ast_stmt *stmt = &function_ast->body[i];
-
-    switch (stmt->kind) {
-    case BEET_AST_STMT_BINDING:
-      if (!beet_scope_bind_slice(&stack, stmt->binding.name,
-                                 stmt->binding.name_len,
-                                 stmt->binding.is_mutable)) {
-        return 0;
-      }
-      break;
-
-    case BEET_AST_STMT_RETURN:
-      if (!beet_resolve_expr(&stack, &stmt->expr)) {
-        return 0;
-      }
-      break;
-
-    default:
-      return 0;
-    }
-  }
-
-  return 1;
+  return beet_resolve_stmt_list(&stack, function_ast->body,
+                                function_ast->body_count);
 }

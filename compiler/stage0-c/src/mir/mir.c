@@ -53,6 +53,7 @@ void beet_mir_function_init(beet_mir_function *function, const char *name,
   function->instr_count = 0U;
   function->local_count = 0U;
   function->next_temp = 0;
+  function->next_label = 0;
 }
 
 int beet_mir_add_const_int(beet_mir_function *function, int value) {
@@ -165,6 +166,80 @@ int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
 
   function->instr_count += 1U;
   return temp;
+}
+
+int beet_mir_next_label(beet_mir_function *function) {
+  int label_id;
+
+  assert(function != NULL);
+
+  label_id = function->next_label;
+  function->next_label += 1;
+  return label_id;
+}
+
+int beet_mir_add_label(beet_mir_function *function, int label_id) {
+  beet_mir_instr *instr;
+
+  assert(function != NULL);
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return 0;
+  }
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = BEET_MIR_OP_LABEL;
+  instr->dst = -1;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
+  instr->int_value = label_id;
+  instr->name[0] = '\0';
+
+  function->instr_count += 1U;
+  return 1;
+}
+
+int beet_mir_add_jump(beet_mir_function *function, int label_id) {
+  beet_mir_instr *instr;
+
+  assert(function != NULL);
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return 0;
+  }
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = BEET_MIR_OP_JUMP;
+  instr->dst = -1;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
+  instr->int_value = label_id;
+  instr->name[0] = '\0';
+
+  function->instr_count += 1U;
+  return 1;
+}
+
+int beet_mir_add_jump_if_false(beet_mir_function *function, int condition_temp,
+                               int label_id) {
+  beet_mir_instr *instr;
+
+  assert(function != NULL);
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return 0;
+  }
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = BEET_MIR_OP_JUMP_IF_FALSE;
+  instr->dst = condition_temp;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
+  instr->int_value = label_id;
+  instr->name[0] = '\0';
+
+  function->instr_count += 1U;
+  return 1;
 }
 
 int beet_mir_add_return_local(beet_mir_function *function, const char *name,
@@ -343,6 +418,10 @@ static int beet_mir_lower_expr(beet_mir_function *function,
   }
 }
 
+static int beet_mir_lower_stmt_list(beet_mir_function *function,
+                                    const beet_ast_stmt *stmts,
+                                    size_t stmt_count);
+
 static int beet_mir_lower_return_stmt(beet_mir_function *function,
                                       const beet_ast_stmt *stmt) {
   int value;
@@ -375,25 +454,42 @@ static int beet_mir_lower_return_stmt(beet_mir_function *function,
   }
 }
 
-int beet_mir_lower_trivial_return_function(
-    beet_mir_function *function, const beet_ast_function *function_ast,
-    size_t entry_index) {
-  (void)entry_index;
+static int beet_mir_lower_if_stmt(beet_mir_function *function,
+                                  const beet_ast_stmt *stmt) {
+  int condition_temp;
+  int end_label;
 
-  return beet_mir_lower_function(function, function_ast);
+  assert(function != NULL);
+  assert(stmt != NULL);
+  assert(stmt->kind == BEET_AST_STMT_IF);
+
+  if (!beet_mir_lower_expr(function, &stmt->condition, &condition_temp)) {
+    return 0;
+  }
+
+  end_label = beet_mir_next_label(function);
+  if (!beet_mir_add_jump_if_false(function, condition_temp, end_label)) {
+    return 0;
+  }
+
+  if (!beet_mir_lower_stmt_list(function, stmt->then_body,
+                                stmt->then_body_count)) {
+    return 0;
+  }
+
+  return beet_mir_add_label(function, end_label);
 }
 
-int beet_mir_lower_function(beet_mir_function *function,
-                            const beet_ast_function *function_ast) {
+static int beet_mir_lower_stmt_list(beet_mir_function *function,
+                                    const beet_ast_stmt *stmts,
+                                    size_t stmt_count) {
   size_t i;
 
   assert(function != NULL);
-  assert(function_ast != NULL);
+  assert(stmts != NULL || stmt_count == 0U);
 
-  beet_mir_function_init(function, function_ast->name, function_ast->name_len);
-
-  for (i = 0U; i < function_ast->body_count; ++i) {
-    const beet_ast_stmt *stmt = &function_ast->body[i];
+  for (i = 0U; i < stmt_count; ++i) {
+    const beet_ast_stmt *stmt = &stmts[i];
 
     switch (stmt->kind) {
     case BEET_AST_STMT_BINDING:
@@ -408,10 +504,34 @@ int beet_mir_lower_function(beet_mir_function *function,
       }
       break;
 
+    case BEET_AST_STMT_IF:
+      if (!beet_mir_lower_if_stmt(function, stmt)) {
+        return 0;
+      }
+      break;
+
     default:
       return 0;
     }
   }
 
   return 1;
+}
+
+int beet_mir_lower_trivial_return_function(
+    beet_mir_function *function, const beet_ast_function *function_ast,
+    size_t entry_index) {
+  (void)entry_index;
+
+  return beet_mir_lower_function(function, function_ast);
+}
+
+int beet_mir_lower_function(beet_mir_function *function,
+                            const beet_ast_function *function_ast) {
+  assert(function != NULL);
+  assert(function_ast != NULL);
+
+  beet_mir_function_init(function, function_ast->name, function_ast->name_len);
+  return beet_mir_lower_stmt_list(function, function_ast->body,
+                                  function_ast->body_count);
 }

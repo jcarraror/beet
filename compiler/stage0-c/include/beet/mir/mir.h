@@ -17,6 +17,9 @@ typedef enum beet_mir_opcode {
   BEET_MIR_OP_SUB_INT,
   BEET_MIR_OP_MUL_INT,
   BEET_MIR_OP_DIV_INT,
+  BEET_MIR_OP_LABEL,
+  BEET_MIR_OP_JUMP,
+  BEET_MIR_OP_JUMP_IF_FALSE,
   BEET_MIR_OP_RETURN_LOCAL,
   BEET_MIR_OP_RETURN_TEMP,
   BEET_MIR_OP_RETURN_CONST_INT
@@ -40,6 +43,7 @@ typedef struct beet_mir_function {
   size_t local_count;
 
   int next_temp;
+  int next_label;
 } beet_mir_function;
 
 void beet_mir_function_init(beet_mir_function *function, const char *name,
@@ -52,11 +56,15 @@ int beet_mir_add_load_local(beet_mir_function *function, const char *name,
                             size_t name_len);
 int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
                             int lhs_temp, int rhs_temp);
+int beet_mir_next_label(beet_mir_function *function);
+int beet_mir_add_label(beet_mir_function *function, int label_id);
+int beet_mir_add_jump(beet_mir_function *function, int label_id);
+int beet_mir_add_jump_if_false(beet_mir_function *function, int condition_temp,
+                               int label_id);
 int beet_mir_add_return_local(beet_mir_function *function, const char *name,
                               size_t name_len);
 int beet_mir_add_return_temp(beet_mir_function *function, int temp);
 int beet_mir_add_return_const_int(beet_mir_function *function, int value);
-
 int beet_mir_lower_binding(beet_mir_function *function,
                            const beet_ast_binding *binding);
 
