@@ -156,6 +156,44 @@ static void test_jump_to_missing_label_fails(void) {
   assert(!beet_vm_execute(&vm, &fn, &result));
 }
 
+static void test_while_false_skips_body(void) {
+  beet_bytecode_function fn;
+  beet_vm vm;
+  int result;
+
+  beet_bytecode_function_init(&fn);
+
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 0));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 0, 0));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_JUMP_IF_FALSE, 0, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_JUMP, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 2));
+
+  assert(beet_vm_execute(&vm, &fn, &result));
+  assert(result == 2);
+}
+
+static void test_while_true_returns_from_body(void) {
+  beet_bytecode_function fn;
+  beet_vm vm;
+  int result;
+
+  beet_bytecode_function_init(&fn);
+
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 0));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 0, 1));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_JUMP_IF_FALSE, 0, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 7));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_JUMP, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 2));
+
+  assert(beet_vm_execute(&vm, &fn, &result));
+  assert(result == 7);
+}
+
 int main(void) {
   test_return_const();
   test_store_and_return_local();
@@ -167,5 +205,7 @@ int main(void) {
   test_jump_if_false_takes_branch();
   test_jump_if_false_falls_through_on_true();
   test_jump_to_missing_label_fails();
+  test_while_false_skips_body();
+  test_while_true_returns_from_body();
   return 0;
 }

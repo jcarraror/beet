@@ -185,3 +185,14 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "7"
 )
+
+
+add_test(
+    NAME driver_return_while_true
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_while_true.beet
+)
+set_tests_properties(
+    driver_return_while_true
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "7"
+)
