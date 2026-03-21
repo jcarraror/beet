@@ -237,6 +237,27 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
       break;
     }
 
+    case BEET_AST_STMT_WHILE: {
+      beet_type condition_type;
+      beet_local_type loop_locals[BEET_TYPE_CHECK_MAX_LOCALS];
+      size_t loop_local_count;
+
+      condition_type =
+          beet_type_check_expr(&stmt->condition, locals, *local_count);
+      if (condition_type.kind != BEET_TYPE_BOOL) {
+        return 0;
+      }
+
+      memcpy(loop_locals, locals, sizeof(beet_local_type) * (*local_count));
+      loop_local_count = *local_count;
+      if (!beet_type_check_stmt_list(stmt->loop_body, stmt->loop_body_count,
+                                     return_type, loop_locals,
+                                     &loop_local_count)) {
+        return 0;
+      }
+      break;
+    }
+
     default:
       return 0;
     }

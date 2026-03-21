@@ -501,6 +501,43 @@ static int beet_mir_lower_return_stmt(beet_mir_function *function,
   }
 }
 
+static int beet_mir_lower_while_stmt(beet_mir_function *function,
+                                     const beet_ast_stmt *stmt) {
+  int start_label;
+  int end_label;
+  int condition_temp;
+
+  assert(function != NULL);
+  assert(stmt != NULL);
+  assert(stmt->kind == BEET_AST_STMT_WHILE);
+
+  start_label = beet_mir_next_label(function);
+  end_label = beet_mir_next_label(function);
+
+  if (!beet_mir_add_label(function, start_label)) {
+    return 0;
+  }
+
+  if (!beet_mir_lower_expr(function, &stmt->condition, &condition_temp)) {
+    return 0;
+  }
+
+  if (!beet_mir_add_jump_if_false(function, condition_temp, end_label)) {
+    return 0;
+  }
+
+  if (!beet_mir_lower_stmt_list(function, stmt->loop_body,
+                                stmt->loop_body_count)) {
+    return 0;
+  }
+
+  if (!beet_mir_add_jump(function, start_label)) {
+    return 0;
+  }
+
+  return beet_mir_add_label(function, end_label);
+}
+
 static int beet_mir_lower_if_stmt(beet_mir_function *function,
                                   const beet_ast_stmt *stmt) {
   int condition_temp;
@@ -553,6 +590,12 @@ static int beet_mir_lower_stmt_list(beet_mir_function *function,
 
     case BEET_AST_STMT_IF:
       if (!beet_mir_lower_if_stmt(function, stmt)) {
+        return 0;
+      }
+      break;
+
+    case BEET_AST_STMT_WHILE:
+      if (!beet_mir_lower_while_stmt(function, stmt)) {
         return 0;
       }
       break;

@@ -188,6 +188,23 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
       }
       break;
 
+    case BEET_AST_STMT_WHILE:
+      if (!beet_resolve_expr(stack, &stmt->condition)) {
+        return 0;
+      }
+      if (!beet_scope_enter(stack)) {
+        return 0;
+      }
+      if (!beet_resolve_stmt_list(stack, stmt->loop_body,
+                                  stmt->loop_body_count)) {
+        (void)beet_scope_leave(stack);
+        return 0;
+      }
+      if (!beet_scope_leave(stack)) {
+        return 0;
+      }
+      break;
+
     default:
       return 0;
     }
