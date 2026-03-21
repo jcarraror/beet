@@ -137,6 +137,26 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr) {
     expr->resolved_is_mutable = symbol->is_mutable;
     return 1;
 
+  case BEET_AST_EXPR_CONSTRUCT: {
+    size_t i;
+
+    for (i = 0U; i < expr->field_init_count; ++i) {
+      if (expr->field_inits[i].value == NULL) {
+        return 0;
+      }
+      if (!beet_resolve_expr(stack, expr->field_inits[i].value)) {
+        return 0;
+      }
+    }
+    return 1;
+  }
+
+  case BEET_AST_EXPR_FIELD:
+    if (expr->left == NULL) {
+      return 0;
+    }
+    return beet_resolve_expr(stack, expr->left);
+
   case BEET_AST_EXPR_UNARY:
     if (expr->left == NULL) {
       return 0;

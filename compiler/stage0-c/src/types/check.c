@@ -102,9 +102,101 @@ beet_find_local_type(const beet_local_type *locals, size_t local_count,
   return NULL;
 }
 
+static beet_type beet_invalid_type(void) {
+  beet_type type;
+
+  type.kind = BEET_TYPE_INVALID;
+  type.name = NULL;
+  type.name_len = 0U;
+  return type;
+}
+
+static int beet_type_is_valid(const beet_type *type) {
+  assert(type != NULL);
+
+  return type->kind != BEET_TYPE_INVALID;
+}
+
+static int beet_type_equals(const beet_type *left, const beet_type *right) {
+  assert(left != NULL);
+  assert(right != NULL);
+
+  if (left->kind != right->kind) {
+    return 0;
+  }
+
+  if (left->kind != BEET_TYPE_NAMED) {
+    return 1;
+  }
+
+  return beet_name_equals_slice(left->name, left->name_len, right->name,
+                                right->name_len);
+}
+
+static const beet_ast_type_decl *
+beet_find_type_decl(const beet_ast_type_decl *type_decls, size_t decl_count,
+                    const char *name, size_t name_len) {
+  size_t i;
+
+  assert(type_decls != NULL || decl_count == 0U);
+  assert(name != NULL);
+
+  for (i = 0U; i < decl_count; ++i) {
+    if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len, name,
+                               name_len)) {
+      return &type_decls[i];
+    }
+  }
+
+  return NULL;
+}
+
+static beet_type
+beet_type_from_name_slice_in_context(const char *name, size_t name_len,
+                                     const beet_ast_type_decl *type_decls,
+                                     size_t decl_count) {
+  beet_type type;
+  const beet_ast_type_decl *decl;
+
+  type = beet_type_from_name_slice(name, name_len);
+  if (beet_type_is_known(&type)) {
+    return type;
+  }
+
+  decl = beet_find_type_decl(type_decls, decl_count, name, name_len);
+  if (decl == NULL) {
+    return beet_invalid_type();
+  }
+
+  type.kind = BEET_TYPE_NAMED;
+  type.name = decl->name;
+  type.name_len = decl->name_len;
+  return type;
+}
+
+static const beet_ast_field *
+beet_find_structure_field(const beet_ast_type_decl *type_decl, const char *name,
+                          size_t name_len) {
+  size_t i;
+
+  assert(type_decl != NULL);
+  assert(name != NULL);
+
+  for (i = 0U; i < type_decl->field_count; ++i) {
+    if (beet_name_equals_slice(type_decl->fields[i].name,
+                               type_decl->fields[i].name_len, name, name_len)) {
+      return &type_decl->fields[i];
+    }
+  }
+
+  return NULL;
+}
+
 static beet_type beet_type_check_expr(const beet_ast_expr *expr,
                                       const beet_local_type *locals,
-                                      size_t local_count) {
+                                      size_t local_count,
+                                      const beet_ast_type_decl *type_decls,
+                                      size_t decl_count) {
   beet_type type;
   beet_type operand_type;
   beet_type left_type;
@@ -113,18 +205,19 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
 
   assert(expr != NULL);
 
-  type.kind = BEET_TYPE_INVALID;
-  type.name = NULL;
+  type = beet_invalid_type();
 
   switch (expr->kind) {
   case BEET_AST_EXPR_INT_LITERAL:
     type.kind = BEET_TYPE_INT;
     type.name = "Int";
+    type.name_len = 3U;
     return type;
 
   case BEET_AST_EXPR_BOOL_LITERAL:
     type.kind = BEET_TYPE_BOOL;
     type.name = "Bool";
+    type.name_len = 4U;
     return type;
 
   case BEET_AST_EXPR_NAME:
@@ -135,12 +228,96 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
     }
     return local->type;
 
+  case BEET_AST_EXPR_CONSTRUCT: {
+    const beet_ast_type_decl *type_decl;
+    size_t i;
+    size_t j;
+
+    type_decl =
+        beet_find_type_decl(type_decls, decl_count, expr->text, expr->text_len);
+    if (type_decl == NULL || !type_decl->is_structure) {
+      return type;
+    }
+
+    if (expr->field_init_count != type_decl->field_count) {
+      return type;
+    }
+
+    for (i = 0U; i < expr->field_init_count; ++i) {
+      const beet_ast_field *field_decl;
+      beet_type field_type;
+      beet_type value_type;
+
+      for (j = i + 1U; j < expr->field_init_count; ++j) {
+        if (beet_name_equals_slice(
+                expr->field_inits[i].name, expr->field_inits[i].name_len,
+                expr->field_inits[j].name, expr->field_inits[j].name_len)) {
+          return type;
+        }
+      }
+
+      field_decl = beet_find_structure_field(
+          type_decl, expr->field_inits[i].name, expr->field_inits[i].name_len);
+      if (field_decl == NULL || expr->field_inits[i].value == NULL) {
+        return type;
+      }
+
+      field_type = beet_type_from_name_slice_in_context(
+          field_decl->type_name, field_decl->type_name_len, type_decls,
+          decl_count);
+      value_type = beet_type_check_expr(expr->field_inits[i].value, locals,
+                                        local_count, type_decls, decl_count);
+      if (!beet_type_is_valid(&field_type) ||
+          !beet_type_is_valid(&value_type) ||
+          !beet_type_equals(&field_type, &value_type)) {
+        return type;
+      }
+    }
+
+    type.kind = BEET_TYPE_NAMED;
+    type.name = type_decl->name;
+    type.name_len = type_decl->name_len;
+    return type;
+  }
+
+  case BEET_AST_EXPR_FIELD: {
+    const beet_ast_type_decl *type_decl;
+    const beet_ast_field *field_decl;
+
+    if (expr->left == NULL) {
+      return type;
+    }
+
+    left_type = beet_type_check_expr(expr->left, locals, local_count,
+                                     type_decls, decl_count);
+    if (left_type.kind != BEET_TYPE_NAMED) {
+      return type;
+    }
+
+    type_decl = beet_find_type_decl(type_decls, decl_count, left_type.name,
+                                    left_type.name_len);
+    if (type_decl == NULL || !type_decl->is_structure) {
+      return type;
+    }
+
+    field_decl =
+        beet_find_structure_field(type_decl, expr->text, expr->text_len);
+    if (field_decl == NULL) {
+      return type;
+    }
+
+    return beet_type_from_name_slice_in_context(field_decl->type_name,
+                                                field_decl->type_name_len,
+                                                type_decls, decl_count);
+  }
+
   case BEET_AST_EXPR_UNARY:
     if (expr->unary_op != BEET_AST_UNARY_NEGATE || expr->left == NULL) {
       return type;
     }
 
-    operand_type = beet_type_check_expr(expr->left, locals, local_count);
+    operand_type = beet_type_check_expr(expr->left, locals, local_count,
+                                        type_decls, decl_count);
     if (operand_type.kind != BEET_TYPE_INT) {
       return type;
     }
@@ -151,8 +328,10 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
       return type;
     }
 
-    left_type = beet_type_check_expr(expr->left, locals, local_count);
-    right_type = beet_type_check_expr(expr->right, locals, local_count);
+    left_type = beet_type_check_expr(expr->left, locals, local_count,
+                                     type_decls, decl_count);
+    right_type = beet_type_check_expr(expr->right, locals, local_count,
+                                      type_decls, decl_count);
     if (left_type.kind != BEET_TYPE_INT || right_type.kind != BEET_TYPE_INT) {
       return type;
     }
@@ -164,6 +343,7 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
     case BEET_AST_BINARY_DIV:
       type.kind = BEET_TYPE_INT;
       type.name = "Int";
+      type.name_len = 3U;
       return type;
 
     case BEET_AST_BINARY_EQ:
@@ -174,6 +354,7 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
     case BEET_AST_BINARY_GE:
       type.kind = BEET_TYPE_BOOL;
       type.name = "Bool";
+      type.name_len = 4U;
       return type;
 
     default:
@@ -185,10 +366,43 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
   }
 }
 
+static beet_type_check_result beet_type_check_binding_annotation_in_context(
+    const beet_ast_binding *binding, const beet_ast_type_decl *type_decls,
+    size_t decl_count) {
+  beet_type_check_result result;
+
+  assert(binding != NULL);
+
+  result.ok = 1;
+  result.declared_type = beet_invalid_type();
+  result.value_type = beet_type_check_binding(binding);
+
+  if (!binding->has_type) {
+    return result;
+  }
+
+  result.declared_type = beet_type_from_name_slice_in_context(
+      binding->type_name, binding->type_name_len, type_decls, decl_count);
+
+  if (!beet_type_is_valid(&result.declared_type) ||
+      !beet_type_is_valid(&result.value_type)) {
+    result.ok = 0;
+    return result;
+  }
+
+  if (!beet_type_equals(&result.declared_type, &result.value_type)) {
+    result.ok = 0;
+  }
+
+  return result;
+}
+
 static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
                                      size_t stmt_count, beet_type return_type,
                                      beet_local_type *locals,
-                                     size_t *local_count) {
+                                     size_t *local_count,
+                                     const beet_ast_type_decl *type_decls,
+                                     size_t decl_count) {
   size_t i;
 
   assert(stmts != NULL || stmt_count == 0U);
@@ -204,14 +418,15 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
       beet_type_check_result result;
 
       if (stmt->binding.has_type) {
-        result = beet_type_check_binding_annotation(&stmt->binding);
+        result = beet_type_check_binding_annotation_in_context(
+            &stmt->binding, type_decls, decl_count);
         if (!result.ok) {
           return 0;
         }
         binding_type = result.declared_type;
       } else {
         binding_type = beet_type_check_binding(&stmt->binding);
-        if (!beet_type_is_known(&binding_type)) {
+        if (!beet_type_is_valid(&binding_type)) {
           return 0;
         }
       }
@@ -238,17 +453,18 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
         return 0;
       }
 
-      expr_type = beet_type_check_expr(&stmt->expr, locals, *local_count);
-      if (expr_type.kind != target->type.kind) {
+      expr_type = beet_type_check_expr(&stmt->expr, locals, *local_count,
+                                       type_decls, decl_count);
+      if (!beet_type_equals(&expr_type, &target->type)) {
         return 0;
       }
       break;
     }
 
     case BEET_AST_STMT_RETURN: {
-      beet_type expr_type =
-          beet_type_check_expr(&stmt->expr, locals, *local_count);
-      if (expr_type.kind != return_type.kind) {
+      beet_type expr_type = beet_type_check_expr(
+          &stmt->expr, locals, *local_count, type_decls, decl_count);
+      if (!beet_type_equals(&expr_type, &return_type)) {
         return 0;
       }
       break;
@@ -261,25 +477,25 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
       size_t branch_local_count;
       size_t else_local_count;
 
-      condition_type =
-          beet_type_check_expr(&stmt->condition, locals, *local_count);
+      condition_type = beet_type_check_expr(
+          &stmt->condition, locals, *local_count, type_decls, decl_count);
       if (condition_type.kind != BEET_TYPE_BOOL) {
         return 0;
       }
 
       memcpy(branch_locals, locals, sizeof(beet_local_type) * (*local_count));
       branch_local_count = *local_count;
-      if (!beet_type_check_stmt_list(stmt->then_body, stmt->then_body_count,
-                                     return_type, branch_locals,
-                                     &branch_local_count)) {
+      if (!beet_type_check_stmt_list(
+              stmt->then_body, stmt->then_body_count, return_type,
+              branch_locals, &branch_local_count, type_decls, decl_count)) {
         return 0;
       }
 
       memcpy(else_locals, locals, sizeof(beet_local_type) * (*local_count));
       else_local_count = *local_count;
-      if (!beet_type_check_stmt_list(stmt->else_body, stmt->else_body_count,
-                                     return_type, else_locals,
-                                     &else_local_count)) {
+      if (!beet_type_check_stmt_list(
+              stmt->else_body, stmt->else_body_count, return_type, else_locals,
+              &else_local_count, type_decls, decl_count)) {
         return 0;
       }
       break;
@@ -290,17 +506,17 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
       beet_local_type loop_locals[BEET_TYPE_CHECK_MAX_LOCALS];
       size_t loop_local_count;
 
-      condition_type =
-          beet_type_check_expr(&stmt->condition, locals, *local_count);
+      condition_type = beet_type_check_expr(
+          &stmt->condition, locals, *local_count, type_decls, decl_count);
       if (condition_type.kind != BEET_TYPE_BOOL) {
         return 0;
       }
 
       memcpy(loop_locals, locals, sizeof(beet_local_type) * (*local_count));
       loop_local_count = *local_count;
-      if (!beet_type_check_stmt_list(stmt->loop_body, stmt->loop_body_count,
-                                     return_type, loop_locals,
-                                     &loop_local_count)) {
+      if (!beet_type_check_stmt_list(
+              stmt->loop_body, stmt->loop_body_count, return_type, loop_locals,
+              &loop_local_count, type_decls, decl_count)) {
         return 0;
       }
       break;
@@ -316,51 +532,30 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
 
 beet_type_check_result
 beet_type_check_binding_annotation(const beet_ast_binding *binding) {
-  beet_type_check_result result;
-
-  assert(binding != NULL);
-
-  result.ok = 1;
-  result.declared_type.kind = BEET_TYPE_INVALID;
-  result.declared_type.name = NULL;
-  result.value_type = beet_type_check_binding(binding);
-
-  if (!binding->has_type) {
-    return result;
-  }
-
-  result.declared_type =
-      beet_type_from_name_slice(binding->type_name, binding->type_name_len);
-
-  if (!beet_type_is_known(&result.value_type)) {
-    result.ok = 0;
-    return result;
-  }
-
-  if (result.declared_type.kind != result.value_type.kind) {
-    result.ok = 0;
-  }
-
-  return result;
+  return beet_type_check_binding_annotation_in_context(binding, NULL, 0U);
 }
 
-int beet_type_check_function_signature(const beet_ast_function *function_ast) {
+int beet_type_check_function_signature_with_type_decls(
+    const beet_ast_function *function_ast, const beet_ast_type_decl *type_decls,
+    size_t decl_count) {
   size_t i;
   beet_type return_type;
 
   assert(function_ast != NULL);
+  assert(type_decls != NULL || decl_count == 0U);
 
-  return_type = beet_type_from_name_slice(function_ast->return_type_name,
-                                          function_ast->return_type_name_len);
-  if (!beet_type_is_known(&return_type)) {
+  return_type = beet_type_from_name_slice_in_context(
+      function_ast->return_type_name, function_ast->return_type_name_len,
+      type_decls, decl_count);
+  if (!beet_type_is_valid(&return_type)) {
     return 0;
   }
 
   for (i = 0U; i < function_ast->param_count; ++i) {
-    beet_type param_type =
-        beet_type_from_name_slice(function_ast->params[i].type_name,
-                                  function_ast->params[i].type_name_len);
-    if (!beet_type_is_known(&param_type)) {
+    beet_type param_type = beet_type_from_name_slice_in_context(
+        function_ast->params[i].type_name,
+        function_ast->params[i].type_name_len, type_decls, decl_count);
+    if (!beet_type_is_valid(&param_type)) {
       return 0;
     }
   }
@@ -368,26 +563,35 @@ int beet_type_check_function_signature(const beet_ast_function *function_ast) {
   return 1;
 }
 
-int beet_type_check_function_body(const beet_ast_function *function_ast) {
+int beet_type_check_function_signature(const beet_ast_function *function_ast) {
+  return beet_type_check_function_signature_with_type_decls(function_ast, NULL,
+                                                            0U);
+}
+
+int beet_type_check_function_body_with_type_decls(
+    const beet_ast_function *function_ast, const beet_ast_type_decl *type_decls,
+    size_t decl_count) {
   beet_local_type locals[BEET_TYPE_CHECK_MAX_LOCALS];
   beet_type return_type;
   size_t local_count;
   size_t i;
 
   assert(function_ast != NULL);
+  assert(type_decls != NULL || decl_count == 0U);
 
-  return_type = beet_type_from_name_slice(function_ast->return_type_name,
-                                          function_ast->return_type_name_len);
-  if (!beet_type_is_known(&return_type)) {
+  return_type = beet_type_from_name_slice_in_context(
+      function_ast->return_type_name, function_ast->return_type_name_len,
+      type_decls, decl_count);
+  if (!beet_type_is_valid(&return_type)) {
     return 0;
   }
 
   local_count = 0U;
   for (i = 0U; i < function_ast->param_count; ++i) {
-    beet_type param_type =
-        beet_type_from_name_slice(function_ast->params[i].type_name,
-                                  function_ast->params[i].type_name_len);
-    if (!beet_type_is_known(&param_type) ||
+    beet_type param_type = beet_type_from_name_slice_in_context(
+        function_ast->params[i].type_name,
+        function_ast->params[i].type_name_len, type_decls, decl_count);
+    if (!beet_type_is_valid(&param_type) ||
         local_count >= BEET_TYPE_CHECK_MAX_LOCALS) {
       return 0;
     }
@@ -400,7 +604,12 @@ int beet_type_check_function_body(const beet_ast_function *function_ast) {
   }
 
   return beet_type_check_stmt_list(function_ast->body, function_ast->body_count,
-                                   return_type, locals, &local_count);
+                                   return_type, locals, &local_count,
+                                   type_decls, decl_count);
+}
+
+int beet_type_check_function_body(const beet_ast_function *function_ast) {
+  return beet_type_check_function_body_with_type_decls(function_ast, NULL, 0U);
 }
 
 static int beet_type_name_is_builtin(const char *name, size_t name_len) {
@@ -419,8 +628,7 @@ static int beet_type_decl_has_param(const beet_ast_type_decl *type_decl,
 
   for (i = 0U; i < type_decl->param_count; ++i) {
     if (beet_name_equals_slice(type_decl->params[i].name,
-                               type_decl->params[i].name_len, name,
-                               name_len)) {
+                               type_decl->params[i].name_len, name, name_len)) {
       return 1;
     }
   }
@@ -428,35 +636,15 @@ static int beet_type_decl_has_param(const beet_ast_type_decl *type_decl,
   return 0;
 }
 
-static int beet_type_decl_list_has_name(const beet_ast_type_decl *type_decls,
-                                        size_t decl_count, const char *name,
-                                        size_t name_len) {
-  size_t i;
-
-  assert(type_decls != NULL || decl_count == 0U);
-  assert(name != NULL);
-
-  for (i = 0U; i < decl_count; ++i) {
-    if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len,
-                               name, name_len)) {
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
-static int beet_type_name_is_known_for_decl(const beet_ast_type_decl *type_decl,
-                                            const beet_ast_type_decl *type_decls,
-                                            size_t decl_count,
-                                            const char *name,
-                                            size_t name_len) {
+static int beet_type_name_is_known_for_decl(
+    const beet_ast_type_decl *type_decl, const beet_ast_type_decl *type_decls,
+    size_t decl_count, const char *name, size_t name_len) {
   assert(type_decl != NULL);
   assert(name != NULL);
 
   return beet_type_name_is_builtin(name, name_len) ||
          beet_type_decl_has_param(type_decl, name, name_len) ||
-         beet_type_decl_list_has_name(type_decls, decl_count, name, name_len);
+         beet_find_type_decl(type_decls, decl_count, name, name_len) != NULL;
 }
 
 static int beet_type_decl_names_are_unique(const beet_ast_type_decl *type_decls,
@@ -469,8 +657,7 @@ static int beet_type_decl_names_are_unique(const beet_ast_type_decl *type_decls,
   for (i = 0U; i < decl_count; ++i) {
     for (j = i + 1U; j < decl_count; ++j) {
       if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len,
-                                 type_decls[j].name,
-                                 type_decls[j].name_len)) {
+                                 type_decls[j].name, type_decls[j].name_len)) {
         return 0;
       }
     }
@@ -479,7 +666,8 @@ static int beet_type_decl_names_are_unique(const beet_ast_type_decl *type_decls,
   return 1;
 }
 
-static int beet_type_decl_params_are_unique(const beet_ast_type_decl *type_decl) {
+static int
+beet_type_decl_params_are_unique(const beet_ast_type_decl *type_decl) {
   size_t i;
   size_t j;
 
@@ -487,10 +675,9 @@ static int beet_type_decl_params_are_unique(const beet_ast_type_decl *type_decl)
 
   for (i = 0U; i < type_decl->param_count; ++i) {
     for (j = i + 1U; j < type_decl->param_count; ++j) {
-      if (beet_name_equals_slice(type_decl->params[i].name,
-                                 type_decl->params[i].name_len,
-                                 type_decl->params[j].name,
-                                 type_decl->params[j].name_len)) {
+      if (beet_name_equals_slice(
+              type_decl->params[i].name, type_decl->params[i].name_len,
+              type_decl->params[j].name, type_decl->params[j].name_len)) {
         return 0;
       }
     }
@@ -499,7 +686,8 @@ static int beet_type_decl_params_are_unique(const beet_ast_type_decl *type_decl)
   return 1;
 }
 
-static int beet_structure_fields_are_unique(const beet_ast_type_decl *type_decl) {
+static int
+beet_structure_fields_are_unique(const beet_ast_type_decl *type_decl) {
   size_t i;
   size_t j;
 
@@ -507,10 +695,9 @@ static int beet_structure_fields_are_unique(const beet_ast_type_decl *type_decl)
 
   for (i = 0U; i < type_decl->field_count; ++i) {
     for (j = i + 1U; j < type_decl->field_count; ++j) {
-      if (beet_name_equals_slice(type_decl->fields[i].name,
-                                 type_decl->fields[i].name_len,
-                                 type_decl->fields[j].name,
-                                 type_decl->fields[j].name_len)) {
+      if (beet_name_equals_slice(
+              type_decl->fields[i].name, type_decl->fields[i].name_len,
+              type_decl->fields[j].name, type_decl->fields[j].name_len)) {
         return 0;
       }
     }
@@ -519,7 +706,8 @@ static int beet_structure_fields_are_unique(const beet_ast_type_decl *type_decl)
   return 1;
 }
 
-static int beet_choice_variants_are_unique(const beet_ast_type_decl *type_decl) {
+static int
+beet_choice_variants_are_unique(const beet_ast_type_decl *type_decl) {
   size_t i;
   size_t j;
 
@@ -527,10 +715,9 @@ static int beet_choice_variants_are_unique(const beet_ast_type_decl *type_decl) 
 
   for (i = 0U; i < type_decl->variant_count; ++i) {
     for (j = i + 1U; j < type_decl->variant_count; ++j) {
-      if (beet_name_equals_slice(type_decl->variants[i].name,
-                                 type_decl->variants[i].name_len,
-                                 type_decl->variants[j].name,
-                                 type_decl->variants[j].name_len)) {
+      if (beet_name_equals_slice(
+              type_decl->variants[i].name, type_decl->variants[i].name_len,
+              type_decl->variants[j].name, type_decl->variants[j].name_len)) {
         return 0;
       }
     }
@@ -539,9 +726,10 @@ static int beet_choice_variants_are_unique(const beet_ast_type_decl *type_decl) 
   return 1;
 }
 
-static int beet_type_check_registered_type_decl(
-    const beet_ast_type_decl *type_decl, const beet_ast_type_decl *type_decls,
-    size_t decl_count) {
+static int
+beet_type_check_registered_type_decl(const beet_ast_type_decl *type_decl,
+                                     const beet_ast_type_decl *type_decls,
+                                     size_t decl_count) {
   size_t i;
 
   assert(type_decl != NULL);
@@ -561,9 +749,9 @@ static int beet_type_check_registered_type_decl(
     }
 
     for (i = 0U; i < type_decl->field_count; ++i) {
-      if (!beet_type_name_is_known_for_decl(type_decl, type_decls, decl_count,
-                                            type_decl->fields[i].type_name,
-                                            type_decl->fields[i].type_name_len)) {
+      if (!beet_type_name_is_known_for_decl(
+              type_decl, type_decls, decl_count, type_decl->fields[i].type_name,
+              type_decl->fields[i].type_name_len)) {
         return 0;
       }
     }

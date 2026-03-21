@@ -528,6 +528,152 @@ static void test_if_condition_bool_ok(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_body_field_access_on_named_param_ok(void) {
+  const char *decl_text = "type Point = structure {\n"
+                          "    x is Int\n"
+                          "    y is Int\n"
+                          "}\n";
+  const char *function_text = "function get(point is Point) returns Int {\n"
+                              "    return point.x\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "point.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "get.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void
+test_function_body_structure_construction_and_field_access_ok(void) {
+  const char *decl_text = "type Point = structure {\n"
+                          "    x is Int\n"
+                          "    y is Int\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    return Point(x = 3, y = 4).x\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "point.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void
+test_function_body_structure_construction_rejects_field_type_mismatch(void) {
+  const char *decl_text = "type Point = structure {\n"
+                          "    x is Int\n"
+                          "    y is Int\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    return Point(x = true, y = 4).x\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "point.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(!beet_type_check_function_body_with_type_decls(&function_ast,
+                                                        &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void test_function_body_field_access_rejects_unknown_field(void) {
+  const char *decl_text = "type Point = structure {\n"
+                          "    x is Int\n"
+                          "    y is Int\n"
+                          "}\n";
+  const char *function_text = "function get(point is Point) returns Int {\n"
+                              "    return point.z\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "point.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "get.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(!beet_type_check_function_body_with_type_decls(&function_ast,
+                                                        &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 static void test_if_condition_rejects_non_bool(void) {
   const char *text = "function choose(x is Int) returns Int {\n"
                      "    if x {\n"
@@ -623,6 +769,10 @@ int main(void) {
   test_mutable_assignment_ok();
   test_assignment_rejects_immutable_target();
   test_assignment_rejects_type_mismatch();
+  test_function_body_field_access_on_named_param_ok();
+  test_function_body_structure_construction_and_field_access_ok();
+  test_function_body_structure_construction_rejects_field_type_mismatch();
+  test_function_body_field_access_rejects_unknown_field();
   test_if_condition_bool_ok();
   test_if_condition_rejects_non_bool();
   test_while_condition_bool_ok();

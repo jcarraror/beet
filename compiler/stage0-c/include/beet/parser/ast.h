@@ -15,6 +15,8 @@ typedef enum beet_ast_expr_kind {
   BEET_AST_EXPR_INT_LITERAL,
   BEET_AST_EXPR_BOOL_LITERAL,
   BEET_AST_EXPR_NAME,
+  BEET_AST_EXPR_CONSTRUCT,
+  BEET_AST_EXPR_FIELD,
   BEET_AST_EXPR_UNARY,
   BEET_AST_EXPR_BINARY
 } beet_ast_expr_kind;
@@ -34,6 +36,14 @@ typedef enum beet_ast_binary_op {
   BEET_AST_BINARY_GE
 } beet_ast_binary_op;
 
+struct beet_ast_expr;
+
+typedef struct beet_ast_field_init {
+  const char *name;
+  size_t name_len;
+  struct beet_ast_expr *value;
+} beet_ast_field_init;
+
 typedef struct beet_ast_expr {
   beet_ast_expr_kind kind;
   const char *text;
@@ -47,6 +57,9 @@ typedef struct beet_ast_expr {
   beet_ast_binary_op binary_op;
   struct beet_ast_expr *left;
   struct beet_ast_expr *right;
+
+  beet_ast_field_init field_inits[BEET_AST_MAX_FIELDS];
+  size_t field_init_count;
 } beet_ast_expr;
 
 typedef struct beet_ast_binding {

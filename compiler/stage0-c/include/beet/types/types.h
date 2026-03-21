@@ -15,6 +15,7 @@ typedef enum beet_type_kind {
 typedef struct beet_type {
   beet_type_kind kind;
   const char *name;
+  size_t name_len;
 } beet_type;
 
 beet_type beet_type_from_name_slice(const char *name, size_t len);

@@ -21,24 +21,29 @@ beet_type beet_type_from_name_slice(const char *name, size_t len) {
 
   type.kind = BEET_TYPE_NAMED;
   type.name = name;
+  type.name_len = len;
 
   if (beet_name_equals(name, len, "Int")) {
     type.kind = BEET_TYPE_INT;
+    type.name_len = 3U;
     return type;
   }
 
   if (beet_name_equals(name, len, "Float")) {
     type.kind = BEET_TYPE_FLOAT;
+    type.name_len = 5U;
     return type;
   }
 
   if (beet_name_equals(name, len, "Bool")) {
     type.kind = BEET_TYPE_BOOL;
+    type.name_len = 4U;
     return type;
   }
 
   if (beet_name_equals(name, len, "Unit")) {
     type.kind = BEET_TYPE_UNIT;
+    type.name_len = 4U;
     return type;
   }
 
