@@ -206,6 +206,46 @@ static void test_function_body_bool_return_ok(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_body_comparison_ok(void) {
+  const char *text = "function main() returns Bool {\n"
+                     "    return 1 + 2 < 3 * 4\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_function_body_comparison_rejects_non_int(void) {
+  const char *text = "function main(flag is Bool) returns Bool {\n"
+                     "    return flag == true\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(!beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_if_condition_bool_ok(void) {
   const char *text = "function choose(flag is Bool) returns Int {\n"
                      "    if flag {\n"
@@ -310,6 +350,8 @@ int main(void) {
   test_function_body_unary_grouped_int_ok();
   test_function_body_arithmetic_rejects_non_int();
   test_function_body_bool_return_ok();
+  test_function_body_comparison_ok();
+  test_function_body_comparison_rejects_non_int();
   test_if_condition_bool_ok();
   test_if_condition_rejects_non_bool();
   test_while_condition_bool_ok();

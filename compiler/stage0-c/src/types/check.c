@@ -156,9 +156,28 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
       return type;
     }
 
-    type.kind = BEET_TYPE_INT;
-    type.name = "Int";
-    return type;
+    switch (expr->binary_op) {
+    case BEET_AST_BINARY_ADD:
+    case BEET_AST_BINARY_SUB:
+    case BEET_AST_BINARY_MUL:
+    case BEET_AST_BINARY_DIV:
+      type.kind = BEET_TYPE_INT;
+      type.name = "Int";
+      return type;
+
+    case BEET_AST_BINARY_EQ:
+    case BEET_AST_BINARY_NE:
+    case BEET_AST_BINARY_LT:
+    case BEET_AST_BINARY_LE:
+    case BEET_AST_BINARY_GT:
+    case BEET_AST_BINARY_GE:
+      type.kind = BEET_TYPE_BOOL;
+      type.name = "Bool";
+      return type;
+
+    default:
+      return type;
+    }
 
   default:
     return type;
