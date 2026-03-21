@@ -48,5 +48,5 @@ beet_type beet_type_from_name_slice(const char *name, size_t len) {
 int beet_type_is_known(const beet_type *type) {
   assert(type != NULL);
 
-  return type->kind != BEET_TYPE_INVALID;
+  return type->kind != BEET_TYPE_INVALID && type->kind != BEET_TYPE_NAMED;
 }

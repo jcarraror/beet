@@ -16,5 +16,7 @@ beet_type_check_binding_annotation(const beet_ast_binding *binding);
 int beet_type_check_function_signature(const beet_ast_function *function_ast);
 int beet_type_check_function_body(const beet_ast_function *function_ast);
 int beet_type_check_type_decl(const beet_ast_type_decl *type_decl);
+int beet_type_check_type_decls(const beet_ast_type_decl *type_decls,
+                               size_t decl_count);
 
 #endif

@@ -140,9 +140,17 @@ typedef struct beet_ast_choice_variant {
   size_t payload_type_name_len;
 } beet_ast_choice_variant;
 
+typedef struct beet_ast_type_param {
+  const char *name;
+  size_t name_len;
+} beet_ast_type_param;
+
 typedef struct beet_ast_type_decl {
   const char *name;
   size_t name_len;
+
+  beet_ast_type_param params[BEET_AST_MAX_PARAMS];
+  size_t param_count;
 
   int is_structure;
   int is_choice;

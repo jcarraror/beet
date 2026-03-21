@@ -126,6 +126,151 @@ static void test_type_decl_fields_known(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_parameterized_structure_type_decl_ok(void) {
+  const char *text = "type Box(Value) = structure {\n"
+                     "    value is Value\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+  assert(beet_type_check_type_decl(&type_decl));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_parameterized_choice_type_decl_ok(void) {
+  const char *text = "type Option(Value) = choice {\n"
+                     "    none\n"
+                     "    some(Value)\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+  assert(beet_type_check_type_decl(&type_decl));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_type_decls_resolve_named_types_across_decls(void) {
+  const char *text = "type Point = structure {\n"
+                     "    x is Int\n"
+                     "    y is Int\n"
+                     "}\n"
+                     "type Line = structure {\n"
+                     "    start is Point\n"
+                     "    end is Point\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl decls[2];
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &decls[0]));
+  assert(beet_parser_parse_type_decl(&parser, &decls[1]));
+  assert(beet_type_check_type_decls(decls, 2U));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_type_decl_rejects_unknown_named_type(void) {
+  const char *text = "type Box = structure {\n"
+                     "    value is Missing\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+  assert(beet_type_check_type_decl(&type_decl) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_type_decls_reject_duplicate_names(void) {
+  const char *text = "type Point = structure {\n"
+                     "    x is Int\n"
+                     "}\n"
+                     "type Point = choice {\n"
+                     "    none\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl decls[2];
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &decls[0]));
+  assert(beet_parser_parse_type_decl(&parser, &decls[1]));
+  assert(beet_type_check_type_decls(decls, 2U) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_choice_type_decl_rejects_duplicate_variants(void) {
+  const char *text = "type Bool = choice {\n"
+                     "    true\n"
+                     "    true\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+  assert(beet_type_check_type_decl(&type_decl) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_function_signature_rejects_unknown_type_name(void) {
+  const char *text = "function main(x is Missing) returns Int {\n"
+                     "    return 0\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_function_body_arithmetic_ok(void) {
   const char *text = "function add(x is Int, y is Int) returns Int {\n"
                      "    return x + y * 2\n"
@@ -460,6 +605,13 @@ int main(void) {
   test_typed_binding_mismatch();
   test_function_signature_types();
   test_type_decl_fields_known();
+  test_parameterized_structure_type_decl_ok();
+  test_parameterized_choice_type_decl_ok();
+  test_type_decls_resolve_named_types_across_decls();
+  test_type_decl_rejects_unknown_named_type();
+  test_type_decls_reject_duplicate_names();
+  test_choice_type_decl_rejects_duplicate_variants();
+  test_function_signature_rejects_unknown_type_name();
   test_function_body_arithmetic_ok();
   test_function_body_unary_grouped_int_ok();
   test_function_body_arithmetic_rejects_non_int();

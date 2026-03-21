@@ -403,19 +403,210 @@ int beet_type_check_function_body(const beet_ast_function *function_ast) {
                                    return_type, locals, &local_count);
 }
 
-int beet_type_check_type_decl(const beet_ast_type_decl *type_decl) {
+static int beet_type_name_is_builtin(const char *name, size_t name_len) {
+  beet_type type;
+
+  type = beet_type_from_name_slice(name, name_len);
+  return beet_type_is_known(&type);
+}
+
+static int beet_type_decl_has_param(const beet_ast_type_decl *type_decl,
+                                    const char *name, size_t name_len) {
   size_t i;
 
   assert(type_decl != NULL);
+  assert(name != NULL);
 
-  if (!type_decl->is_structure) {
+  for (i = 0U; i < type_decl->param_count; ++i) {
+    if (beet_name_equals_slice(type_decl->params[i].name,
+                               type_decl->params[i].name_len, name,
+                               name_len)) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+static int beet_type_decl_list_has_name(const beet_ast_type_decl *type_decls,
+                                        size_t decl_count, const char *name,
+                                        size_t name_len) {
+  size_t i;
+
+  assert(type_decls != NULL || decl_count == 0U);
+  assert(name != NULL);
+
+  for (i = 0U; i < decl_count; ++i) {
+    if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len,
+                               name, name_len)) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+static int beet_type_name_is_known_for_decl(const beet_ast_type_decl *type_decl,
+                                            const beet_ast_type_decl *type_decls,
+                                            size_t decl_count,
+                                            const char *name,
+                                            size_t name_len) {
+  assert(type_decl != NULL);
+  assert(name != NULL);
+
+  return beet_type_name_is_builtin(name, name_len) ||
+         beet_type_decl_has_param(type_decl, name, name_len) ||
+         beet_type_decl_list_has_name(type_decls, decl_count, name, name_len);
+}
+
+static int beet_type_decl_names_are_unique(const beet_ast_type_decl *type_decls,
+                                           size_t decl_count) {
+  size_t i;
+  size_t j;
+
+  assert(type_decls != NULL || decl_count == 0U);
+
+  for (i = 0U; i < decl_count; ++i) {
+    for (j = i + 1U; j < decl_count; ++j) {
+      if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len,
+                                 type_decls[j].name,
+                                 type_decls[j].name_len)) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+
+static int beet_type_decl_params_are_unique(const beet_ast_type_decl *type_decl) {
+  size_t i;
+  size_t j;
+
+  assert(type_decl != NULL);
+
+  for (i = 0U; i < type_decl->param_count; ++i) {
+    for (j = i + 1U; j < type_decl->param_count; ++j) {
+      if (beet_name_equals_slice(type_decl->params[i].name,
+                                 type_decl->params[i].name_len,
+                                 type_decl->params[j].name,
+                                 type_decl->params[j].name_len)) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+
+static int beet_structure_fields_are_unique(const beet_ast_type_decl *type_decl) {
+  size_t i;
+  size_t j;
+
+  assert(type_decl != NULL);
+
+  for (i = 0U; i < type_decl->field_count; ++i) {
+    for (j = i + 1U; j < type_decl->field_count; ++j) {
+      if (beet_name_equals_slice(type_decl->fields[i].name,
+                                 type_decl->fields[i].name_len,
+                                 type_decl->fields[j].name,
+                                 type_decl->fields[j].name_len)) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+
+static int beet_choice_variants_are_unique(const beet_ast_type_decl *type_decl) {
+  size_t i;
+  size_t j;
+
+  assert(type_decl != NULL);
+
+  for (i = 0U; i < type_decl->variant_count; ++i) {
+    for (j = i + 1U; j < type_decl->variant_count; ++j) {
+      if (beet_name_equals_slice(type_decl->variants[i].name,
+                                 type_decl->variants[i].name_len,
+                                 type_decl->variants[j].name,
+                                 type_decl->variants[j].name_len)) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+
+static int beet_type_check_registered_type_decl(
+    const beet_ast_type_decl *type_decl, const beet_ast_type_decl *type_decls,
+    size_t decl_count) {
+  size_t i;
+
+  assert(type_decl != NULL);
+  assert(type_decls != NULL || decl_count == 0U);
+
+  if (type_decl->is_structure == type_decl->is_choice) {
     return 0;
   }
 
-  for (i = 0U; i < type_decl->field_count; ++i) {
-    beet_type field_type = beet_type_from_name_slice(
-        type_decl->fields[i].type_name, type_decl->fields[i].type_name_len);
-    if (!beet_type_is_known(&field_type)) {
+  if (!beet_type_decl_params_are_unique(type_decl)) {
+    return 0;
+  }
+
+  if (type_decl->is_structure) {
+    if (!beet_structure_fields_are_unique(type_decl)) {
+      return 0;
+    }
+
+    for (i = 0U; i < type_decl->field_count; ++i) {
+      if (!beet_type_name_is_known_for_decl(type_decl, type_decls, decl_count,
+                                            type_decl->fields[i].type_name,
+                                            type_decl->fields[i].type_name_len)) {
+        return 0;
+      }
+    }
+
+    return 1;
+  }
+
+  if (!beet_choice_variants_are_unique(type_decl)) {
+    return 0;
+  }
+
+  for (i = 0U; i < type_decl->variant_count; ++i) {
+    if (type_decl->variants[i].has_payload &&
+        !beet_type_name_is_known_for_decl(
+            type_decl, type_decls, decl_count,
+            type_decl->variants[i].payload_type_name,
+            type_decl->variants[i].payload_type_name_len)) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+int beet_type_check_type_decl(const beet_ast_type_decl *type_decl) {
+  assert(type_decl != NULL);
+
+  return beet_type_check_type_decls(type_decl, 1U);
+}
+
+int beet_type_check_type_decls(const beet_ast_type_decl *type_decls,
+                               size_t decl_count) {
+  size_t i;
+
+  assert(type_decls != NULL || decl_count == 0U);
+
+  if (!beet_type_decl_names_are_unique(type_decls, decl_count)) {
+    return 0;
+  }
+
+  for (i = 0U; i < decl_count; ++i) {
+    if (!beet_type_check_registered_type_decl(&type_decls[i], type_decls,
+                                              decl_count)) {
       return 0;
     }
   }

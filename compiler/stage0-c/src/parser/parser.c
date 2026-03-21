@@ -809,6 +809,7 @@ int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out) {
 
   out->name = parser->current.lexeme;
   out->name_len = parser->current.lexeme_len;
+  out->param_count = 0U;
   out->is_structure = 0;
   out->is_choice = 0;
   out->field_count = 0U;
@@ -822,6 +823,13 @@ int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out) {
         return 0;
       }
 
+      if (out->param_count >= BEET_AST_MAX_PARAMS) {
+        return 0;
+      }
+
+      out->params[out->param_count].name = parser->current.lexeme;
+      out->params[out->param_count].name_len = parser->current.lexeme_len;
+      out->param_count += 1U;
       beet_parser_advance(parser);
 
       if (beet_parser_match(parser, BEET_TOKEN_COMMA)) {

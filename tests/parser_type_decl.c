@@ -49,6 +49,8 @@ static void test_parameterized_structure(void) {
   assert(beet_parser_parse_type_decl(&parser, &type_decl));
   assert(strncmp(type_decl.name, "Box", 3) == 0);
   assert(type_decl.is_structure == 1);
+  assert(type_decl.param_count == 1U);
+  assert(strncmp(type_decl.params[0].name, "Value", 5) == 0);
   assert(type_decl.field_count == 1U);
   assert(strncmp(type_decl.fields[0].name, "value", 5) == 0);
   assert(strncmp(type_decl.fields[0].type_name, "Value", 5) == 0);
@@ -75,6 +77,8 @@ static void test_simple_choice(void) {
   assert(strncmp(type_decl.name, "Option", 6) == 0);
   assert(type_decl.is_structure == 0);
   assert(type_decl.is_choice == 1);
+  assert(type_decl.param_count == 1U);
+  assert(strncmp(type_decl.params[0].name, "Value", 5) == 0);
   assert(type_decl.variant_count == 2U);
 
   assert(strncmp(type_decl.variants[0].name, "none", 4) == 0);
@@ -106,6 +110,7 @@ static void test_choice_with_multiple_bare_variants(void) {
   assert(strncmp(type_decl.name, "Bool", 4) == 0);
   assert(type_decl.is_structure == 0);
   assert(type_decl.is_choice == 1);
+  assert(type_decl.param_count == 0U);
   assert(type_decl.variant_count == 2U);
   assert(type_decl.variants[0].has_payload == 0);
   assert(type_decl.variants[1].has_payload == 0);
