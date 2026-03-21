@@ -196,3 +196,24 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "7"
 )
+
+
+add_test(
+    NAME driver_return_decision_then
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_decision_then.beet
+)
+set_tests_properties(
+    driver_return_decision_then
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "7"
+)
+
+add_test(
+    NAME driver_return_decision_else
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_decision_else.beet
+)
+set_tests_properties(
+    driver_return_decision_else
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "9"
+)
