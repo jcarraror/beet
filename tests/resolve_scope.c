@@ -131,7 +131,7 @@ static void test_resolve_if_condition_bool_literal(void) {
 
   assert(beet_parser_parse_function(&parser, &function_ast));
   assert(beet_resolve_function(&function_ast));
-  assert(function_ast.body[0].condition.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].condition.kind == BEET_AST_EXPR_BOOL_LITERAL);
   assert(function_ast.body[0].condition.is_resolved == 0);
 
   beet_source_file_dispose(&file);

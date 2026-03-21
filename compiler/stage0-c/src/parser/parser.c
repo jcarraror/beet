@@ -1,6 +1,7 @@
 #include "beet/parser/parser.h"
 
 #include <assert.h>
+#include <string.h>
 
 static void beet_parser_advance(beet_parser *parser) {
   parser->current = beet_lexer_next(&parser->lexer);
@@ -218,9 +219,16 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
   }
 
   if (parser->current.kind == BEET_TOKEN_IDENTIFIER) {
-    out->kind = BEET_AST_EXPR_NAME;
     out->text = parser->current.lexeme;
     out->text_len = parser->current.lexeme_len;
+
+    if ((out->text_len == 4U && strncmp(out->text, "true", 4U) == 0) ||
+        (out->text_len == 5U && strncmp(out->text, "false", 5U) == 0)) {
+      out->kind = BEET_AST_EXPR_BOOL_LITERAL;
+    } else {
+      out->kind = BEET_AST_EXPR_NAME;
+    }
+
     beet_parser_advance(parser);
     return 1;
   }

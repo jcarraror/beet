@@ -220,7 +220,7 @@ static void test_while_statement_function(void) {
   assert(beet_parser_parse_function(&parser, &function_ast));
   assert(function_ast.body_count == 2U);
   assert(function_ast.body[0].kind == BEET_AST_STMT_WHILE);
-  assert(function_ast.body[0].condition.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].condition.kind == BEET_AST_EXPR_BOOL_LITERAL);
   assert(function_ast.body[0].condition.text_len == 4U);
   assert(strncmp(function_ast.body[0].condition.text, "true", 4) == 0);
   assert(function_ast.body[0].loop_body_count == 2U);
@@ -232,7 +232,7 @@ static void test_while_statement_function(void) {
 
   assert(function_ast.body[0].loop_body[1].kind == BEET_AST_STMT_IF);
   assert(function_ast.body[0].loop_body[1].condition.kind ==
-         BEET_AST_EXPR_NAME);
+         BEET_AST_EXPR_BOOL_LITERAL);
   assert(function_ast.body[0].loop_body[1].condition.text_len == 5U);
   assert(strncmp(function_ast.body[0].loop_body[1].condition.text, "false",
                  5) == 0);
