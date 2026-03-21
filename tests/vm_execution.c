@@ -431,6 +431,114 @@ static void test_execute_program_recursive_call(void) {
   assert(result == 3);
 }
 
+static void test_execute_match_on_local_choice_binding(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    bind value is MaybeInt = MaybeInt.some(7)\n"
+                              "    match value {\n"
+                              "        case none {\n"
+                              "            return 0\n"
+                              "        }\n"
+                              "        case some(item) {\n"
+                              "            return item\n"
+                              "        }\n"
+                              "    }\n"
+                              "    return 1\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+  beet_vm vm;
+  int result;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+  assert(beet_mir_lower_function_with_type_decls(&mir_function, &function_ast,
+                                                 &type_decl, 1U));
+  assert(beet_codegen_function(&mir_function, &bytecode_function));
+  assert(beet_vm_execute(&vm, &bytecode_function, &result));
+  assert(result == 7);
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void test_execute_match_on_empty_choice_variant(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    bind value is MaybeInt = MaybeInt.none()\n"
+                              "    match value {\n"
+                              "        case none {\n"
+                              "            return 0\n"
+                              "        }\n"
+                              "        case some(item) {\n"
+                              "            return item\n"
+                              "        }\n"
+                              "    }\n"
+                              "    return 1\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+  beet_vm vm;
+  int result;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+  assert(beet_mir_lower_function_with_type_decls(&mir_function, &function_ast,
+                                                 &type_decl, 1U));
+  assert(beet_codegen_function(&mir_function, &bytecode_function));
+  assert(beet_vm_execute(&vm, &bytecode_function, &result));
+  assert(result == 0);
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 int main(void) {
   test_return_const();
   test_store_and_return_local();
@@ -452,5 +560,7 @@ int main(void) {
   test_execute_lowered_structure_binding_field_access_program();
   test_execute_program_function_call();
   test_execute_program_recursive_call();
+  test_execute_match_on_local_choice_binding();
+  test_execute_match_on_empty_choice_variant();
   return 0;
 }

@@ -676,6 +676,101 @@ static void test_lower_function_call_expression(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_lower_match_on_local_choice_binding(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    bind value is MaybeInt = MaybeInt.some(7)\n"
+                              "    match value {\n"
+                              "        case none {\n"
+                              "            return 0\n"
+                              "        }\n"
+                              "        case some(item) {\n"
+                              "            return item\n"
+                              "        }\n"
+                              "    }\n"
+                              "    return 1\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  size_t i;
+  int saw_eq = 0;
+  int saw_jump_if_false = 0;
+  int saw_return_local = 0;
+  int saw_return_const_zero = 0;
+  int saw_return_const_one = 0;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+  assert(beet_mir_lower_function_with_type_decls(&mir_function, &function_ast,
+                                                 &type_decl, 1U));
+
+  assert(mir_function.local_count == 3U);
+  assert(strcmp(mir_function.locals[0], "value.tag") == 0);
+  assert(strcmp(mir_function.locals[1], "value.some") == 0);
+  assert(strcmp(mir_function.locals[2], "item") == 0);
+  assert(mir_function.instr_count >= 12U);
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[0].int_value == 1);
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_BIND_LOCAL);
+  assert(strcmp(mir_function.instrs[1].name, "value.tag") == 0);
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[2].int_value == 7);
+  assert(mir_function.instrs[3].op == BEET_MIR_OP_BIND_LOCAL);
+  assert(strcmp(mir_function.instrs[3].name, "value.some") == 0);
+
+  for (i = 0U; i < mir_function.instr_count; ++i) {
+    if (mir_function.instrs[i].op == BEET_MIR_OP_EQ_INT) {
+      saw_eq = 1;
+    }
+    if (mir_function.instrs[i].op == BEET_MIR_OP_JUMP_IF_FALSE) {
+      saw_jump_if_false = 1;
+    }
+    if (mir_function.instrs[i].op == BEET_MIR_OP_RETURN_LOCAL &&
+        strcmp(mir_function.instrs[i].name, "item") == 0) {
+      saw_return_local = 1;
+    }
+    if (mir_function.instrs[i].op == BEET_MIR_OP_RETURN_CONST_INT &&
+        mir_function.instrs[i].int_value == 0) {
+      saw_return_const_zero = 1;
+    }
+    if (mir_function.instrs[i].op == BEET_MIR_OP_RETURN_CONST_INT &&
+        mir_function.instrs[i].int_value == 1) {
+      saw_return_const_one = 1;
+    }
+  }
+
+  assert(saw_eq);
+  assert(saw_jump_if_false);
+  assert(saw_return_local);
+  assert(saw_return_const_zero);
+  assert(saw_return_const_one);
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 int main(void) {
   test_lower_binding_to_mir();
   test_lower_mutable_binding_to_mir();
@@ -693,5 +788,6 @@ int main(void) {
   test_lower_assignment_inside_if_statement();
   test_lower_structure_binding_and_field_return();
   test_lower_function_call_expression();
+  test_lower_match_on_local_choice_binding();
   return 0;
 }

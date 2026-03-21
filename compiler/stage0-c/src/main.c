@@ -159,7 +159,8 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
   }
 
   for (i = 0U; i < function_count; ++i) {
-    if (!beet_mir_lower_function(&mir_functions[i], &functions[i])) {
+    if (!beet_mir_lower_function_with_type_decls(
+            &mir_functions[i], &functions[i], type_decls, type_decl_count)) {
       fprintf(stderr, "error: failed to lower function to MIR\n");
       beet_source_file_dispose(&file);
       return 0;

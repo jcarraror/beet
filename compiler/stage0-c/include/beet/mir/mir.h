@@ -88,6 +88,10 @@ int beet_mir_lower_trivial_return_function(
     beet_mir_function *function, const beet_ast_function *function_ast,
     size_t entry_index);
 
+int beet_mir_lower_function_with_type_decls(
+    beet_mir_function *function, const beet_ast_function *function_ast,
+    const beet_ast_type_decl *type_decls, size_t decl_count);
+
 int beet_mir_lower_function(beet_mir_function *function,
                             const beet_ast_function *function_ast);
 
