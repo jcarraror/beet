@@ -44,6 +44,134 @@ static int beet_parse_int_slice(const char *text, size_t len, int *out_value) {
   return 1;
 }
 
+static int beet_name_equals_slice(const char *left, size_t left_len,
+                                  const char *right, size_t right_len) {
+  return left_len == right_len && strncmp(left, right, left_len) == 0;
+}
+
+static const beet_ast_expr *
+beet_mir_find_construct_field_value(const beet_ast_expr *construct,
+                                    const char *name, size_t name_len) {
+  size_t i;
+
+  assert(construct != NULL);
+  assert(name != NULL);
+
+  if (construct->kind != BEET_AST_EXPR_CONSTRUCT) {
+    return NULL;
+  }
+
+  for (i = 0U; i < construct->field_init_count; ++i) {
+    if (construct->field_inits[i].value == NULL) {
+      continue;
+    }
+
+    if (beet_name_equals_slice(construct->field_inits[i].name,
+                               construct->field_inits[i].name_len, name,
+                               name_len)) {
+      return construct->field_inits[i].value;
+    }
+  }
+
+  return NULL;
+}
+
+static const beet_ast_expr *
+beet_mir_resolve_field_value_expr(const beet_ast_expr *expr) {
+  const beet_ast_expr *base_expr;
+
+  assert(expr != NULL);
+
+  if (expr->kind == BEET_AST_EXPR_CONSTRUCT) {
+    return expr;
+  }
+
+  if (expr->kind != BEET_AST_EXPR_FIELD || expr->left == NULL) {
+    return NULL;
+  }
+
+  base_expr = beet_mir_resolve_field_value_expr(expr->left);
+  if (base_expr == NULL) {
+    return NULL;
+  }
+
+  return beet_mir_find_construct_field_value(base_expr, expr->text,
+                                             expr->text_len);
+}
+
+static int beet_mir_append_name_slice(char *name, size_t *name_len,
+                                      const char *text, size_t text_len) {
+  assert(name != NULL);
+  assert(name_len != NULL);
+  assert(text != NULL);
+
+  if (*name_len + text_len >= BEET_MIR_MAX_NAME_LEN) {
+    return 0;
+  }
+
+  memcpy(name + *name_len, text, text_len);
+  *name_len += text_len;
+  name[*name_len] = '\0';
+  return 1;
+}
+
+static int beet_mir_build_field_path(const beet_ast_expr *expr, char *name,
+                                     size_t *name_len) {
+  assert(expr != NULL);
+  assert(name != NULL);
+  assert(name_len != NULL);
+
+  switch (expr->kind) {
+  case BEET_AST_EXPR_NAME:
+    return beet_mir_append_name_slice(name, name_len, expr->text,
+                                      expr->text_len);
+
+  case BEET_AST_EXPR_FIELD:
+    if (expr->left == NULL) {
+      return 0;
+    }
+
+    if (!beet_mir_build_field_path(expr->left, name, name_len)) {
+      return 0;
+    }
+
+    if (!beet_mir_append_name_slice(name, name_len, ".", 1U)) {
+      return 0;
+    }
+
+    return beet_mir_append_name_slice(name, name_len, expr->text,
+                                      expr->text_len);
+
+  default:
+    return 0;
+  }
+}
+
+static int beet_mir_build_field_name(char *name, const char *base_name,
+                                     size_t base_name_len,
+                                     const char *field_name,
+                                     size_t field_name_len) {
+  size_t name_len;
+
+  assert(name != NULL);
+  assert(base_name != NULL);
+  assert(field_name != NULL);
+
+  name_len = 0U;
+  name[0] = '\0';
+
+  if (!beet_mir_append_name_slice(name, &name_len, base_name, base_name_len)) {
+    return 0;
+  }
+
+  if (!beet_mir_append_name_slice(name, &name_len, ".", 1U)) {
+    return 0;
+  }
+
+  return beet_mir_append_name_slice(name, &name_len, field_name,
+                                    field_name_len);
+}
+
 void beet_mir_function_init(beet_mir_function *function, const char *name,
                             size_t name_len) {
   assert(function != NULL);
@@ -333,34 +461,56 @@ int beet_mir_add_return_const_int(beet_mir_function *function, int value) {
   return 1;
 }
 
+static int beet_mir_lower_expr(beet_mir_function *function,
+                               const beet_ast_expr *expr, int *out_temp);
+
+static int beet_mir_lower_expr_into_local(beet_mir_function *function,
+                                          const char *name, size_t name_len,
+                                          const beet_ast_expr *expr) {
+  char field_name[BEET_MIR_MAX_NAME_LEN];
+  int temp;
+  size_t i;
+
+  assert(function != NULL);
+  assert(name != NULL);
+  assert(expr != NULL);
+
+  if (expr->kind == BEET_AST_EXPR_CONSTRUCT) {
+    for (i = 0U; i < expr->field_init_count; ++i) {
+      if (expr->field_inits[i].value == NULL) {
+        return 0;
+      }
+
+      if (!beet_mir_build_field_name(field_name, name, name_len,
+                                     expr->field_inits[i].name,
+                                     expr->field_inits[i].name_len)) {
+        return 0;
+      }
+
+      if (!beet_mir_lower_expr_into_local(function, field_name,
+                                          strlen(field_name),
+                                          expr->field_inits[i].value)) {
+        return 0;
+      }
+    }
+
+    return 1;
+  }
+
+  if (!beet_mir_lower_expr(function, expr, &temp)) {
+    return 0;
+  }
+
+  return beet_mir_add_bind_local(function, name, name_len, temp);
+}
+
 int beet_mir_lower_binding(beet_mir_function *function,
                            const beet_ast_binding *binding) {
-  int value;
-  int temp;
-
   assert(function != NULL);
   assert(binding != NULL);
 
-  if (binding->expr.kind != BEET_AST_EXPR_INT_LITERAL) {
-    return 0;
-  }
-
-  if (!beet_parse_int_slice(binding->expr.text, binding->expr.text_len,
-                            &value)) {
-    return 0;
-  }
-
-  temp = beet_mir_add_const_int(function, value);
-  if (temp < 0) {
-    return 0;
-  }
-
-  if (!beet_mir_add_bind_local(function, binding->name, binding->name_len,
-                               temp)) {
-    return 0;
-  }
-
-  return 1;
+  return beet_mir_lower_expr_into_local(function, binding->name,
+                                        binding->name_len, &binding->expr);
 }
 
 static int
@@ -387,6 +537,9 @@ beet_mir_register_param_locals(beet_mir_function *function,
 
 static int beet_mir_lower_expr(beet_mir_function *function,
                                const beet_ast_expr *expr, int *out_temp) {
+  char local_name[BEET_MIR_MAX_NAME_LEN];
+  const beet_ast_expr *value_expr;
+  size_t local_name_len;
   int lhs_temp;
   int rhs_temp;
 
@@ -416,6 +569,21 @@ static int beet_mir_lower_expr(beet_mir_function *function,
 
   case BEET_AST_EXPR_NAME:
     *out_temp = beet_mir_add_load_local(function, expr->text, expr->text_len);
+    return *out_temp >= 0;
+
+  case BEET_AST_EXPR_FIELD:
+    value_expr = beet_mir_resolve_field_value_expr(expr);
+    if (value_expr != NULL) {
+      return beet_mir_lower_expr(function, value_expr, out_temp);
+    }
+
+    local_name[0] = '\0';
+    local_name_len = 0U;
+    if (!beet_mir_build_field_path(expr, local_name, &local_name_len)) {
+      return 0;
+    }
+
+    *out_temp = beet_mir_add_load_local(function, local_name, local_name_len);
     return *out_temp >= 0;
 
   case BEET_AST_EXPR_UNARY: {
@@ -545,15 +713,11 @@ static int beet_mir_lower_return_stmt(beet_mir_function *function,
     return beet_mir_add_return_local(function, stmt->expr.text,
                                      stmt->expr.text_len);
 
-  case BEET_AST_EXPR_UNARY:
-  case BEET_AST_EXPR_BINARY:
+  default:
     if (!beet_mir_lower_expr(function, &stmt->expr, &temp)) {
       return 0;
     }
     return beet_mir_add_return_temp(function, temp);
-
-  default:
-    return 0;
   }
 }
 

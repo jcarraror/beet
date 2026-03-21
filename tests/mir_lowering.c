@@ -544,9 +544,99 @@ static void test_lower_assignment_inside_if_statement(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_lower_expression_binding_to_mir(void) {
+  const char *text = "bind total = 1 + 2 * 3\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_binding binding;
+  beet_mir_function function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_binding(&parser, &binding));
+
+  beet_mir_function_init(&function, "main", 4U);
+  assert(beet_mir_lower_binding(&function, &binding));
+
+  assert(function.instr_count == 6U);
+  assert(function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(function.instrs[0].int_value == 1);
+  assert(function.instrs[1].op == BEET_MIR_OP_CONST_INT);
+  assert(function.instrs[1].int_value == 2);
+  assert(function.instrs[2].op == BEET_MIR_OP_CONST_INT);
+  assert(function.instrs[2].int_value == 3);
+  assert(function.instrs[3].op == BEET_MIR_OP_MUL_INT);
+  assert(function.instrs[4].op == BEET_MIR_OP_ADD_INT);
+  assert(function.instrs[5].op == BEET_MIR_OP_BIND_LOCAL);
+  assert(strcmp(function.instrs[5].name, "total") == 0);
+  assert(function.local_count == 1U);
+  assert(strcmp(function.locals[0], "total") == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_lower_structure_binding_and_field_return(void) {
+  const char *decl_text = "type Point = structure {\n"
+                          "    x is Int\n"
+                          "    y is Int\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    bind point is Point = Point(x = 3, y = 4)\n"
+                              "    return point.x\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "point.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+
+  assert(mir_function.local_count == 2U);
+  assert(strcmp(mir_function.locals[0], "point.x") == 0);
+  assert(strcmp(mir_function.locals[1], "point.y") == 0);
+  assert(mir_function.instr_count == 6U);
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[0].int_value == 3);
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_BIND_LOCAL);
+  assert(strcmp(mir_function.instrs[1].name, "point.x") == 0);
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[2].int_value == 4);
+  assert(mir_function.instrs[3].op == BEET_MIR_OP_BIND_LOCAL);
+  assert(strcmp(mir_function.instrs[3].name, "point.y") == 0);
+  assert(mir_function.instrs[4].op == BEET_MIR_OP_LOAD_LOCAL);
+  assert(strcmp(mir_function.instrs[4].name, "point.x") == 0);
+  assert(mir_function.instrs[5].op == BEET_MIR_OP_RETURN_TEMP);
+  assert(mir_function.instrs[5].dst == 2);
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 int main(void) {
   test_lower_binding_to_mir();
   test_lower_mutable_binding_to_mir();
+  test_lower_expression_binding_to_mir();
   test_lower_trivial_function_return();
   test_lower_function_body_binding_and_return();
   test_lower_arithmetic_return_expression();
@@ -558,5 +648,6 @@ int main(void) {
   test_lower_if_statement_with_bool_param();
   test_lower_if_else_statement_with_bool_param();
   test_lower_assignment_inside_if_statement();
+  test_lower_structure_binding_and_field_return();
   return 0;
 }

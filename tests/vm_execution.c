@@ -1,5 +1,11 @@
 #include <assert.h>
 
+#include "beet/codegen/codegen.h"
+#include "beet/mir/mir.h"
+#include "beet/parser/parser.h"
+#include "beet/resolve/scope.h"
+#include "beet/support/source.h"
+#include "beet/types/check.h"
 #include "beet/vm/bytecode.h"
 #include "beet/vm/interpreter.h"
 
@@ -274,6 +280,80 @@ static void test_branch_updates_local_and_returns_it(void) {
   assert(result == 3);
 }
 
+static void test_execute_lowered_expression_binding_program(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind total = 1 + 2 * 3\n"
+                     "    return total\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+  beet_vm vm;
+  int result;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "main.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+  assert(beet_codegen_function(&mir_function, &bytecode_function));
+  assert(beet_vm_execute(&vm, &bytecode_function, &result));
+  assert(result == 7);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_execute_lowered_structure_binding_field_access_program(void) {
+  const char *decl_text = "type Point = structure {\n"
+                          "    x is Int\n"
+                          "    y is Int\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    bind point is Point = Point(x = 3, y = 4)\n"
+                              "    return point.x\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+  beet_vm vm;
+  int result;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "point.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+  assert(beet_codegen_function(&mir_function, &bytecode_function));
+  assert(beet_vm_execute(&vm, &bytecode_function, &result));
+  assert(result == 3);
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 int main(void) {
   test_return_const();
   test_store_and_return_local();
@@ -291,5 +371,7 @@ int main(void) {
   test_while_false_skips_body();
   test_while_true_returns_from_body();
   test_branch_updates_local_and_returns_it();
+  test_execute_lowered_expression_binding_program();
+  test_execute_lowered_structure_binding_field_access_program();
   return 0;
 }
