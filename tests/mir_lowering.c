@@ -257,6 +257,46 @@ static void test_lower_arithmetic_with_local_load(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_lower_if_statement_with_bool_literal(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    if true {\n"
+                     "        return 1\n"
+                     "    }\n"
+                     "    return 0\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+
+  assert(strcmp(mir_function.name, "main") == 0);
+  assert(mir_function.instr_count == 5U);
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[0].dst == 0);
+  assert(mir_function.instrs[0].int_value == 1);
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_JUMP_IF_FALSE);
+  assert(mir_function.instrs[1].dst == 0);
+  assert(mir_function.instrs[1].int_value == 0);
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_RETURN_CONST_INT);
+  assert(mir_function.instrs[2].int_value == 1);
+  assert(mir_function.instrs[3].op == BEET_MIR_OP_LABEL);
+  assert(mir_function.instrs[3].int_value == 0);
+  assert(mir_function.instrs[4].op == BEET_MIR_OP_RETURN_CONST_INT);
+  assert(mir_function.instrs[4].int_value == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_lower_if_statement_with_bool_param(void) {
   const char *text = "function choose(flag is Bool) returns Int {\n"
                      "    if flag {\n"
@@ -310,6 +350,7 @@ int main(void) {
   test_lower_arithmetic_return_expression();
   test_lower_unary_arithmetic_return_expression();
   test_lower_arithmetic_with_local_load();
+  test_lower_if_statement_with_bool_literal();
   test_lower_if_statement_with_bool_param();
   return 0;
 }

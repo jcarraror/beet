@@ -20,6 +20,23 @@ static void beet_copy_name(char *dst, const char *src, size_t src_len) {
   dst[copy_len] = '\0';
 }
 
+static int beet_parse_bool_slice(const char *text, size_t len, int *out_value) {
+  assert(text != NULL);
+  assert(out_value != NULL);
+
+  if (len == 4U && strncmp(text, "true", 4U) == 0) {
+    *out_value = 1;
+    return 1;
+  }
+
+  if (len == 5U && strncmp(text, "false", 5U) == 0) {
+    *out_value = 0;
+    return 1;
+  }
+
+  return 0;
+}
+
 static int beet_parse_int_slice(const char *text, size_t len, int *out_value) {
   size_t i;
   int value;
@@ -373,7 +390,11 @@ static int beet_mir_lower_expr(beet_mir_function *function,
     return *out_temp >= 0;
 
   case BEET_AST_EXPR_NAME:
-    *out_temp = beet_mir_add_load_local(function, expr->text, expr->text_len);
+    if (beet_parse_bool_slice(expr->text, expr->text_len, &lhs_temp)) {
+      *out_temp = beet_mir_add_const_int(function, lhs_temp);
+    } else {
+      *out_temp = beet_mir_add_load_local(function, expr->text, expr->text_len);
+    }
     return *out_temp >= 0;
 
   case BEET_AST_EXPR_UNARY: {
@@ -461,6 +482,10 @@ static int beet_mir_lower_return_stmt(beet_mir_function *function,
     return beet_mir_add_return_const_int(function, value);
 
   case BEET_AST_EXPR_NAME:
+    if (beet_parse_bool_slice(stmt->expr.text, stmt->expr.text_len, &value)) {
+      return beet_mir_add_return_const_int(function, value);
+    }
+
     return beet_mir_add_return_local(function, stmt->expr.text,
                                      stmt->expr.text_len);
 

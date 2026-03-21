@@ -122,6 +122,11 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
     return type;
 
   case BEET_AST_EXPR_NAME:
+    type = beet_type_from_value_text(expr->text, expr->text_len);
+    if (type.kind != BEET_TYPE_INVALID) {
+      return type;
+    }
+
     local =
         beet_find_local_type(locals, local_count, expr->text, expr->text_len);
     if (local == NULL) {

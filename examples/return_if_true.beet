@@ -1,0 +1,6 @@
+function main() returns Int {
+    if true {
+        return 7
+    }
+    return 0
+}

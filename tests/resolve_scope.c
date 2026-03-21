@@ -114,6 +114,29 @@ static void test_resolve_return_param_name(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_resolve_if_condition_bool_literal(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    if true {\n"
+                     "        return 1\n"
+                     "    }\n"
+                     "    return 0\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(function_ast.body[0].condition.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].condition.is_resolved == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_reject_missing_return_name(void) {
   const char *text = "function main() returns Int {\n"
                      "    return missing\n"
@@ -139,6 +162,7 @@ int main(void) {
   test_lookup_missing();
   test_resolve_return_local_name();
   test_resolve_return_param_name();
+  test_resolve_if_condition_bool_literal();
   test_reject_missing_return_name();
   return 0;
 }

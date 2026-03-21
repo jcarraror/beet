@@ -96,6 +96,13 @@ const beet_symbol *beet_scope_lookup_slice(const beet_scope_stack *stack,
   return NULL;
 }
 
+static int beet_is_bool_literal_slice(const char *text, size_t len) {
+  assert(text != NULL);
+
+  return (len == 4U && strncmp(text, "true", 4U) == 0) ||
+         (len == 5U && strncmp(text, "false", 5U) == 0);
+}
+
 static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr) {
   const beet_symbol *symbol;
 
@@ -107,6 +114,10 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr) {
     return 1;
 
   case BEET_AST_EXPR_NAME:
+    if (beet_is_bool_literal_slice(expr->text, expr->text_len)) {
+      return 1;
+    }
+
     symbol = beet_scope_lookup_slice(stack, expr->text, expr->text_len);
     if (symbol == NULL) {
       return 0;
