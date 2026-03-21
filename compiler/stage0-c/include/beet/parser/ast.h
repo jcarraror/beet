@@ -5,6 +5,7 @@
 
 #define BEET_AST_MAX_PARAMS 16
 #define BEET_AST_MAX_FIELDS 32
+#define BEET_AST_MAX_VARIANTS 32
 #define BEET_AST_MAX_BODY_STMTS 64
 #define BEET_AST_MAX_STMT_NODES 128
 #define BEET_AST_MAX_EXPR_NODES 128
@@ -110,14 +111,27 @@ typedef struct beet_ast_field {
   size_t type_name_len;
 } beet_ast_field;
 
+typedef struct beet_ast_choice_variant {
+  const char *name;
+  size_t name_len;
+
+  int has_payload;
+  const char *payload_type_name;
+  size_t payload_type_name_len;
+} beet_ast_choice_variant;
+
 typedef struct beet_ast_type_decl {
   const char *name;
   size_t name_len;
 
   int is_structure;
+  int is_choice;
 
   beet_ast_field fields[BEET_AST_MAX_FIELDS];
   size_t field_count;
+
+  beet_ast_choice_variant variants[BEET_AST_MAX_VARIANTS];
+  size_t variant_count;
 } beet_ast_type_decl;
 
 #endif
