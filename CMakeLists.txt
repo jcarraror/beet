@@ -238,3 +238,23 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "6"
 )
+
+add_test(
+    NAME driver_return_point_field
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_point_field.beet
+)
+set_tests_properties(
+    driver_return_point_field
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "3"
+)
+
+add_test(
+    NAME driver_return_bound_point_field
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_bound_point_field.beet
+)
+set_tests_properties(
+    driver_return_bound_point_field
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "3"
+)

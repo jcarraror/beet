@@ -1,0 +1,9 @@
+type Point = structure {
+    x is Int
+    y is Int
+}
+
+function main() returns Int {
+    bind point is Point = Point(x = 3, y = 4)
+    return point.x
+}

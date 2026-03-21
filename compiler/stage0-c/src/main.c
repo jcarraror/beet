@@ -3,12 +3,15 @@
 
 #include "beet/codegen/codegen.h"
 #include "beet/compiler/api.h"
+#include "beet/lexer/token.h"
 #include "beet/mir/mir.h"
 #include "beet/parser/parser.h"
 #include "beet/resolve/scope.h"
 #include "beet/support/source.h"
 #include "beet/types/check.h"
 #include "beet/vm/interpreter.h"
+
+#define BEET_DRIVER_MAX_TYPE_DECLS 32
 
 static int beet_name_equals(const char *name, size_t name_len,
                             const char *expected) {
@@ -21,10 +24,12 @@ static int beet_name_equals(const char *name, size_t name_len,
 static int beet_compile_and_run_file(const char *path, int *out_result) {
   beet_source_file file;
   beet_parser parser;
+  beet_ast_type_decl type_decls[BEET_DRIVER_MAX_TYPE_DECLS];
   beet_ast_function function_ast;
   beet_mir_function mir_function;
   beet_bytecode_function bytecode_function;
   beet_vm vm;
+  size_t type_decl_count;
 
   beet_source_file_init(&file);
 
@@ -34,10 +39,34 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
   }
 
   beet_parser_init(&parser, &file);
+  type_decl_count = 0U;
+
+  while (parser.current.kind == BEET_TOKEN_KW_TYPE) {
+    if (type_decl_count >= BEET_DRIVER_MAX_TYPE_DECLS) {
+      fprintf(stderr, "error: too many type declarations in '%s'\n", path);
+      beet_source_file_dispose(&file);
+      return 0;
+    }
+
+    if (!beet_parser_parse_type_decl(&parser, &type_decls[type_decl_count])) {
+      fprintf(stderr, "error: failed to parse type declaration in '%s'\n",
+              path);
+      beet_source_file_dispose(&file);
+      return 0;
+    }
+
+    type_decl_count += 1U;
+  }
 
   if (!beet_parser_parse_function(&parser, &function_ast)) {
     fprintf(stderr, "error: failed to parse top-level function in '%s'\n",
             path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (parser.current.kind != BEET_TOKEN_EOF) {
+    fprintf(stderr, "error: unexpected top-level form in '%s'\n", path);
     beet_source_file_dispose(&file);
     return 0;
   }
@@ -49,7 +78,14 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
     return 0;
   }
 
-  if (!beet_type_check_function_signature(&function_ast)) {
+  if (!beet_type_check_type_decls(type_decls, type_decl_count)) {
+    fprintf(stderr, "error: invalid type declarations in '%s'\n", path);
+    beet_source_file_dispose(&file);
+    return 0;
+  }
+
+  if (!beet_type_check_function_signature_with_type_decls(
+          &function_ast, type_decls, type_decl_count)) {
     fprintf(stderr, "error: invalid function signature in '%s'\n", path);
     beet_source_file_dispose(&file);
     return 0;
@@ -61,7 +97,8 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
     return 0;
   }
 
-  if (!beet_type_check_function_body(&function_ast)) {
+  if (!beet_type_check_function_body_with_type_decls(
+          &function_ast, type_decls, type_decl_count)) {
     fprintf(stderr, "error: invalid function body types in '%s'\n", path);
     beet_source_file_dispose(&file);
     return 0;
