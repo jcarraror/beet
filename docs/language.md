@@ -51,6 +51,10 @@ if condition {
     ...
 }
 
+while condition {
+    ...
+}
+
 match value {
     case pattern {
         ...

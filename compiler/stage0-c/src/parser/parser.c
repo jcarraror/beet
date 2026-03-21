@@ -146,6 +146,8 @@ static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
   beet_ast_expr_init(&stmt->condition);
   stmt->then_body = NULL;
   stmt->then_body_count = 0U;
+  stmt->loop_body = NULL;
+  stmt->loop_body_count = 0U;
 }
 
 static beet_ast_expr *beet_ast_expr_alloc(beet_ast_function *function) {
@@ -369,6 +371,55 @@ static int beet_parser_parse_stmt(beet_parser *parser,
                                   beet_ast_function *function,
                                   beet_ast_stmt *out);
 
+static int beet_parser_parse_while_stmt(beet_parser *parser,
+                                        beet_ast_function *function,
+                                        beet_ast_stmt *out) {
+  size_t body_start;
+
+  assert(parser != NULL);
+  assert(function != NULL);
+  assert(out != NULL);
+
+  if (!beet_expect(parser, BEET_TOKEN_KW_WHILE)) {
+    return 0;
+  }
+
+  out->kind = BEET_AST_STMT_WHILE;
+  if (!beet_parser_parse_expr(parser, function, &out->condition)) {
+    return 0;
+  }
+
+  if (!beet_expect(parser, BEET_TOKEN_LBRACE)) {
+    return 0;
+  }
+
+  body_start = function->stmt_node_count;
+  while (parser->current.kind != BEET_TOKEN_RBRACE) {
+    beet_ast_stmt *nested_stmt;
+
+    nested_stmt = beet_ast_stmt_alloc(function);
+    if (nested_stmt == NULL) {
+      return 0;
+    }
+
+    if (!beet_parser_parse_stmt(parser, function, nested_stmt)) {
+      return 0;
+    }
+
+    out->loop_body_count += 1U;
+  }
+
+  if (!beet_expect(parser, BEET_TOKEN_RBRACE)) {
+    return 0;
+  }
+
+  if (out->loop_body_count > 0U) {
+    out->loop_body = &function->stmt_nodes[body_start];
+  }
+
+  return 1;
+}
+
 static int beet_parser_parse_if_stmt(beet_parser *parser,
                                      beet_ast_function *function,
                                      beet_ast_stmt *out) {
@@ -441,6 +492,10 @@ static int beet_parser_parse_stmt(beet_parser *parser,
 
   if (parser->current.kind == BEET_TOKEN_KW_IF) {
     return beet_parser_parse_if_stmt(parser, function, out);
+  }
+
+  if (parser->current.kind == BEET_TOKEN_KW_WHILE) {
+    return beet_parser_parse_while_stmt(parser, function, out);
   }
 
   out->kind = BEET_AST_STMT_INVALID;

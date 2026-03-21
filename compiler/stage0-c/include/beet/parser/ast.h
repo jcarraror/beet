@@ -59,7 +59,8 @@ typedef enum beet_ast_stmt_kind {
   BEET_AST_STMT_INVALID = 0,
   BEET_AST_STMT_BINDING,
   BEET_AST_STMT_RETURN,
-  BEET_AST_STMT_IF
+  BEET_AST_STMT_IF,
+  BEET_AST_STMT_WHILE
 } beet_ast_stmt_kind;
 
 typedef struct beet_ast_stmt {
@@ -69,6 +70,8 @@ typedef struct beet_ast_stmt {
   beet_ast_expr condition;
   struct beet_ast_stmt *then_body;
   size_t then_body_count;
+  struct beet_ast_stmt *loop_body;
+  size_t loop_body_count;
 } beet_ast_stmt;
 
 typedef struct beet_ast_param {

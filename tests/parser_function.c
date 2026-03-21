@@ -198,6 +198,62 @@ static void test_unary_and_grouped_expression_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_while_statement_function(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    while true {\n"
+                     "        bind x = 1\n"
+                     "        if false {\n"
+                     "            return x\n"
+                     "        }\n"
+                     "    }\n"
+                     "    return 0\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 2U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_WHILE);
+  assert(function_ast.body[0].condition.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].condition.text_len == 4U);
+  assert(strncmp(function_ast.body[0].condition.text, "true", 4) == 0);
+  assert(function_ast.body[0].loop_body_count == 2U);
+  assert(function_ast.body[0].loop_body != NULL);
+
+  assert(function_ast.body[0].loop_body[0].kind == BEET_AST_STMT_BINDING);
+  assert(function_ast.body[0].loop_body[0].binding.name_len == 1U);
+  assert(strncmp(function_ast.body[0].loop_body[0].binding.name, "x", 1) == 0);
+
+  assert(function_ast.body[0].loop_body[1].kind == BEET_AST_STMT_IF);
+  assert(function_ast.body[0].loop_body[1].condition.kind ==
+         BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].loop_body[1].condition.text_len == 5U);
+  assert(strncmp(function_ast.body[0].loop_body[1].condition.text, "false",
+                 5) == 0);
+  assert(function_ast.body[0].loop_body[1].then_body_count == 1U);
+  assert(function_ast.body[0].loop_body[1].then_body != NULL);
+  assert(function_ast.body[0].loop_body[1].then_body[0].kind ==
+         BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].loop_body[1].then_body[0].expr.kind ==
+         BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].loop_body[1].then_body[0].expr.text_len == 1U);
+  assert(strncmp(function_ast.body[0].loop_body[1].then_body[0].expr.text, "x",
+                 1) == 0);
+
+  assert(function_ast.body[1].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[1].expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(function_ast.body[1].expr.text_len == 1U);
+  assert(strncmp(function_ast.body[1].expr.text, "0", 1) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_if_statement_function(void) {
   const char *text = "function choose(x is Int, y is Int) returns Int {\n"
                      "    if x {\n"
@@ -261,6 +317,7 @@ int main(void) {
   test_function_body_bindings();
   test_expression_precedence_function();
   test_unary_and_grouped_expression_function();
+  test_while_statement_function();
   test_if_statement_function();
   return 0;
 }
