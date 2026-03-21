@@ -119,10 +119,41 @@ static void test_choice_with_multiple_bare_variants(void) {
 
   beet_source_file_dispose(&file);
 }
+
+static void test_type_decl_spans(void) {
+  const char *text = "type Point(Value) = structure {\n"
+                     "    x is Value\n"
+                     "    y is Int\n"
+                     "}\n";
+  const char *field_text;
+  size_t field_offset;
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+
+  field_text = strstr(text, "y is Int");
+  assert(field_text != NULL);
+  field_offset = (size_t)(field_text - text);
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+  assert(type_decl.span.start.offset == 0U);
+  assert(type_decl.span.end.offset == strlen(text) - 1U);
+  assert(type_decl.params[0].span.start.offset == 11U);
+  assert(type_decl.fields[1].span.start.offset == field_offset);
+  assert(type_decl.fields[1].span.end.offset ==
+         field_offset + strlen("y is Int"));
+
+  beet_source_file_dispose(&file);
+}
 int main(void) {
   test_simple_structure();
   test_parameterized_structure();
   test_simple_choice();
   test_choice_with_multiple_bare_variants();
+  test_type_decl_spans();
   return 0;
 }

@@ -210,6 +210,40 @@ static void test_assignment_statement_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_spans(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind x = 10\n"
+                     "    return x\n"
+                     "}\n";
+  const char *bind_text;
+  const char *return_text;
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  bind_text = strstr(text, "bind x = 10");
+  return_text = strstr(text, "return x");
+  assert(bind_text != NULL);
+  assert(return_text != NULL);
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.span.start.offset == 0U);
+  assert(function_ast.span.end.offset == strlen(text) - 1U);
+  assert(function_ast.body[0].span.start.offset == (size_t)(bind_text - text));
+  assert(function_ast.body[0].binding.span.start.offset ==
+         (size_t)(bind_text - text));
+  assert(function_ast.body[1].span.start.offset ==
+         (size_t)(return_text - text));
+  assert(function_ast.body[1].expr.span.start.offset ==
+         (size_t)((return_text - text) + 7));
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_expression_precedence_function(void) {
   const char *text = "function main() returns Int {\n"
                      "    return 1 + 2 * 3\n"
@@ -648,6 +682,7 @@ int main(void) {
   test_function_body_bindings();
   test_function_body_binding_expression();
   test_assignment_statement_function();
+  test_function_spans();
   test_expression_precedence_function();
   test_unary_and_grouped_expression_function();
   test_comparison_expression_function();

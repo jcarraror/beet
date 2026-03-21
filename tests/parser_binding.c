@@ -106,10 +106,36 @@ static void test_expression_bind(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_binding_spans(void) {
+  const char *text = "bind x = 10\n";
+  const char *value_text;
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_binding binding;
+
+  value_text = strstr(text, "10");
+  assert(value_text != NULL);
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_binding(&parser, &binding));
+  assert(binding.span.start.offset == 0U);
+  assert(binding.span.end.offset == (size_t)((value_text - text) + 2));
+  assert(binding.span.start.line == 1U);
+  assert(binding.span.start.column == 1U);
+  assert(binding.expr.span.start.offset == (size_t)(value_text - text));
+  assert(binding.expr.span.end.offset == (size_t)((value_text - text) + 2));
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_simple_bind();
   test_mutable_bind();
   test_typed_bind();
   test_expression_bind();
+  test_binding_spans();
   return 0;
 }
