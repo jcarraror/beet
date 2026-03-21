@@ -63,9 +63,15 @@ typedef struct beet_ast_binding {
   size_t value_len;
 } beet_ast_binding;
 
+typedef struct beet_ast_assignment {
+  const char *name;
+  size_t name_len;
+} beet_ast_assignment;
+
 typedef enum beet_ast_stmt_kind {
   BEET_AST_STMT_INVALID = 0,
   BEET_AST_STMT_BINDING,
+  BEET_AST_STMT_ASSIGNMENT,
   BEET_AST_STMT_RETURN,
   BEET_AST_STMT_IF,
   BEET_AST_STMT_WHILE
@@ -74,6 +80,7 @@ typedef enum beet_ast_stmt_kind {
 typedef struct beet_ast_stmt {
   beet_ast_stmt_kind kind;
   beet_ast_binding binding;
+  beet_ast_assignment assignment;
   beet_ast_expr expr;
   beet_ast_expr condition;
   struct beet_ast_stmt *then_body;

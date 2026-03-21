@@ -139,6 +139,39 @@ static void test_function_body_bindings(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_assignment_statement_function(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    mutable total = 1\n"
+                     "    total = total + 2\n"
+                     "    return total\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 3U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_BINDING);
+  assert(function_ast.body[1].kind == BEET_AST_STMT_ASSIGNMENT);
+  assert(function_ast.body[1].assignment.name_len == 5U);
+  assert(strncmp(function_ast.body[1].assignment.name, "total", 5) == 0);
+  assert(function_ast.body[1].expr.kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[1].expr.binary_op == BEET_AST_BINARY_ADD);
+  assert(function_ast.body[1].expr.left != NULL);
+  assert(function_ast.body[1].expr.left->kind == BEET_AST_EXPR_NAME);
+  assert(strncmp(function_ast.body[1].expr.left->text, "total", 5) == 0);
+  assert(function_ast.body[1].expr.right != NULL);
+  assert(function_ast.body[1].expr.right->kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[1].expr.right->text, "2", 1) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_expression_precedence_function(void) {
   const char *text = "function main() returns Int {\n"
                      "    return 1 + 2 * 3\n"
@@ -221,6 +254,37 @@ static void test_comparison_expression_function(void) {
   assert(function_ast.body[0].expr.right != NULL);
   assert(function_ast.body[0].expr.right->kind == BEET_AST_EXPR_BINARY);
   assert(function_ast.body[0].expr.right->binary_op == BEET_AST_BINARY_MUL);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_assignment_statement_inside_if_function(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    mutable x = 1\n"
+                     "    if true {\n"
+                     "        x = x + 1\n"
+                     "    }\n"
+                     "    return x\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 3U);
+  assert(function_ast.body[1].kind == BEET_AST_STMT_IF);
+  assert(function_ast.body[1].then_body_count == 1U);
+  assert(function_ast.body[1].then_body != NULL);
+  assert(function_ast.body[1].then_body[0].kind == BEET_AST_STMT_ASSIGNMENT);
+  assert(function_ast.body[1].then_body[0].assignment.name_len == 1U);
+  assert(strncmp(function_ast.body[1].then_body[0].assignment.name, "x", 1) ==
+         0);
+  assert(function_ast.body[1].then_body[0].expr.kind == BEET_AST_EXPR_BINARY);
 
   beet_source_file_dispose(&file);
 }
@@ -376,9 +440,11 @@ int main(void) {
   test_function_with_params();
   test_name_return_function();
   test_function_body_bindings();
+  test_assignment_statement_function();
   test_expression_precedence_function();
   test_unary_and_grouped_expression_function();
   test_comparison_expression_function();
+  test_assignment_statement_inside_if_function();
   test_while_statement_function();
   test_if_else_statement_function();
   test_if_statement_function();
