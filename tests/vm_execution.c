@@ -354,6 +354,83 @@ static void test_execute_lowered_structure_binding_field_access_program(void) {
   beet_source_file_dispose(&decl_file);
 }
 
+static void test_execute_program_function_call(void) {
+  beet_bytecode_program program;
+  beet_vm vm;
+  int args[1];
+  int result;
+
+  beet_bytecode_program_init(&program);
+  program.function_count = 2U;
+  beet_bytecode_function_init(&program.functions[0]);
+  beet_bytecode_function_init(&program.functions[1]);
+
+  program.functions[0].param_count = 1U;
+  assert(
+      beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_LOAD_LOCAL, 0, 0));
+  assert(
+      beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_CONST_INT, 1, 1));
+  assert(
+      beet_bytecode_emit4(&program.functions[0], BEET_BC_OP_ADD_INT, 2, 0, 1));
+  assert(beet_bytecode_emit2(&program.functions[0], BEET_BC_OP_RETURN_TEMP, 2));
+
+  args[0] = 0;
+  assert(
+      beet_bytecode_emit3(&program.functions[1], BEET_BC_OP_CONST_INT, 0, 41));
+  assert(beet_bytecode_emit_call(&program.functions[1], 1, 0, args, 1U));
+  assert(beet_bytecode_emit2(&program.functions[1], BEET_BC_OP_RETURN_TEMP, 1));
+
+  assert(beet_vm_execute_program(&vm, &program, 1U, &result));
+  assert(result == 42);
+}
+
+static void test_execute_program_recursive_call(void) {
+  beet_bytecode_program program;
+  beet_vm vm;
+  int args[1];
+  int result;
+
+  beet_bytecode_program_init(&program);
+  program.function_count = 2U;
+  beet_bytecode_function_init(&program.functions[0]);
+  beet_bytecode_function_init(&program.functions[1]);
+
+  program.functions[0].param_count = 1U;
+  assert(
+      beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_LOAD_LOCAL, 0, 0));
+  assert(
+      beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_CONST_INT, 1, 0));
+  assert(
+      beet_bytecode_emit4(&program.functions[0], BEET_BC_OP_EQ_INT, 2, 0, 1));
+  assert(beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_JUMP_IF_FALSE, 2,
+                             0));
+  assert(beet_bytecode_emit2(&program.functions[0], BEET_BC_OP_RETURN_CONST_INT,
+                             0));
+  assert(beet_bytecode_emit2(&program.functions[0], BEET_BC_OP_LABEL, 0));
+  assert(
+      beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_LOAD_LOCAL, 3, 0));
+  assert(
+      beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_CONST_INT, 4, 1));
+  assert(
+      beet_bytecode_emit4(&program.functions[0], BEET_BC_OP_SUB_INT, 5, 3, 4));
+  args[0] = 5;
+  assert(beet_bytecode_emit_call(&program.functions[0], 6, 0, args, 1U));
+  assert(
+      beet_bytecode_emit3(&program.functions[0], BEET_BC_OP_CONST_INT, 7, 1));
+  assert(
+      beet_bytecode_emit4(&program.functions[0], BEET_BC_OP_ADD_INT, 8, 6, 7));
+  assert(beet_bytecode_emit2(&program.functions[0], BEET_BC_OP_RETURN_TEMP, 8));
+
+  args[0] = 0;
+  assert(
+      beet_bytecode_emit3(&program.functions[1], BEET_BC_OP_CONST_INT, 0, 3));
+  assert(beet_bytecode_emit_call(&program.functions[1], 1, 0, args, 1U));
+  assert(beet_bytecode_emit2(&program.functions[1], BEET_BC_OP_RETURN_TEMP, 1));
+
+  assert(beet_vm_execute_program(&vm, &program, 1U, &result));
+  assert(result == 3);
+}
+
 int main(void) {
   test_return_const();
   test_store_and_return_local();
@@ -373,5 +450,7 @@ int main(void) {
   test_branch_updates_local_and_returns_it();
   test_execute_lowered_expression_binding_program();
   test_execute_lowered_structure_binding_field_access_program();
+  test_execute_program_function_call();
+  test_execute_program_recursive_call();
   return 0;
 }

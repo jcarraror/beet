@@ -47,6 +47,13 @@ void beet_bytecode_function_init(beet_bytecode_function *function) {
 
   function->code_count = 0U;
   function->local_count = 0U;
+  function->param_count = 0U;
+}
+
+void beet_bytecode_program_init(beet_bytecode_program *program) {
+  assert(program != NULL);
+
+  program->function_count = 0U;
 }
 
 int beet_bytecode_emit_store_local(beet_bytecode_function *function,
@@ -57,6 +64,30 @@ int beet_bytecode_emit_store_local(beet_bytecode_function *function,
 
   return beet_bytecode_emit3(function, BEET_BC_OP_STORE_LOCAL, local_index,
                              src_temp);
+}
+
+int beet_bytecode_emit_call(beet_bytecode_function *function, int dst_temp,
+                            int function_index, const int *args,
+                            size_t arg_count) {
+  size_t i;
+
+  assert(function != NULL);
+  assert(args != NULL || arg_count == 0U);
+
+  if (function->code_count + 4U + arg_count > BEET_BC_MAX_CODE) {
+    return 0;
+  }
+
+  function->code[function->code_count++] = BEET_BC_OP_CALL;
+  function->code[function->code_count++] = dst_temp;
+  function->code[function->code_count++] = function_index;
+  function->code[function->code_count++] = (int)arg_count;
+
+  for (i = 0U; i < arg_count; ++i) {
+    function->code[function->code_count++] = args[i];
+  }
+
+  return 1;
 }
 
 int beet_bytecode_emit_binary_int(beet_bytecode_function *function,

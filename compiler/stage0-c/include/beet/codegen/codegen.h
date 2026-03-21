@@ -6,5 +6,8 @@
 
 int beet_codegen_function(const beet_mir_function *mir_function,
                           beet_bytecode_function *bytecode_function);
+int beet_codegen_program(const beet_mir_function *mir_functions,
+                         size_t function_count,
+                         beet_bytecode_program *bytecode_program);
 
 #endif

@@ -3,7 +3,18 @@
 #include <assert.h>
 #include <string.h>
 
-static size_t beet_vm_instr_width(int op) {
+static size_t beet_vm_instr_width_at(const beet_bytecode_function *function,
+                                     size_t pc) {
+  int op;
+
+  assert(function != NULL);
+
+  if (pc >= function->code_count) {
+    return 0U;
+  }
+
+  op = function->code[pc];
+
   switch (op) {
   case BEET_BC_OP_CONST_INT:
   case BEET_BC_OP_STORE_LOCAL:
@@ -30,6 +41,12 @@ static size_t beet_vm_instr_width(int op) {
   case BEET_BC_OP_JUMP:
     return 2U;
 
+  case BEET_BC_OP_CALL:
+    if (pc + 4U > function->code_count) {
+      return 0U;
+    }
+    return 4U + (size_t)function->code[pc + 3U];
+
   default:
     return 0U;
   }
@@ -44,14 +61,14 @@ static int beet_vm_find_label_pc(const beet_bytecode_function *function,
 
   pc = 0U;
   while (pc < function->code_count) {
-    int op = function->code[pc];
-    size_t width = beet_vm_instr_width(op);
+    size_t width = beet_vm_instr_width_at(function, pc);
 
     if (width == 0U || pc + width > function->code_count) {
       return 0;
     }
 
-    if (op == BEET_BC_OP_LABEL && function->code[pc + 1U] == label_id) {
+    if (function->code[pc] == BEET_BC_OP_LABEL &&
+        function->code[pc + 1U] == label_id) {
       *out_pc = pc + width;
       return 1;
     }
@@ -62,166 +79,271 @@ static int beet_vm_find_label_pc(const beet_bytecode_function *function,
   return 0;
 }
 
-int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
-                    int *out_result) {
-  size_t pc;
+static beet_vm_frame *beet_vm_current_frame(beet_vm *vm) {
+  assert(vm != NULL);
+  assert(vm->frame_count > 0U);
+
+  return &vm->frames[vm->frame_count - 1U];
+}
+
+static const beet_bytecode_function *
+beet_vm_current_function(const beet_vm *vm,
+                         const beet_bytecode_program *program) {
+  const beet_vm_frame *frame;
 
   assert(vm != NULL);
-  assert(function != NULL);
+  assert(program != NULL);
+  assert(vm->frame_count > 0U);
+
+  frame = &vm->frames[vm->frame_count - 1U];
+  if (frame->function_index >= program->function_count) {
+    return NULL;
+  }
+
+  return &program->functions[frame->function_index];
+}
+
+static int beet_vm_push_frame(beet_vm *vm, size_t function_index,
+                              int return_dest) {
+  beet_vm_frame *frame;
+
+  assert(vm != NULL);
+
+  if (vm->frame_count >= BEET_VM_MAX_CALL_FRAMES) {
+    return 0;
+  }
+
+  frame = &vm->frames[vm->frame_count];
+  memset(frame, 0, sizeof(*frame));
+  frame->function_index = function_index;
+  frame->pc = 0U;
+  frame->return_dest = return_dest;
+  vm->frame_count += 1U;
+  return 1;
+}
+
+int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
+                            size_t entry_index, int *out_result) {
+  assert(vm != NULL);
+  assert(program != NULL);
   assert(out_result != NULL);
 
-  memset(vm->regs, 0, sizeof(vm->regs));
-  memset(vm->locals, 0, sizeof(vm->locals));
+  if (entry_index >= program->function_count) {
+    return 0;
+  }
 
-  pc = 0U;
+  vm->frame_count = 0U;
+  if (!beet_vm_push_frame(vm, entry_index, -1)) {
+    return 0;
+  }
 
-  while (pc < function->code_count) {
-    int op = function->code[pc++];
+  while (vm->frame_count > 0U) {
+    beet_vm_frame *frame = beet_vm_current_frame(vm);
+    const beet_bytecode_function *function =
+        beet_vm_current_function(vm, program);
 
-    switch (op) {
+    if (function == NULL || frame->pc >= function->code_count) {
+      return 0;
+    }
+
+    switch (function->code[frame->pc]) {
     case BEET_BC_OP_CONST_INT: {
-      int dst = function->code[pc++];
-      int value = function->code[pc++];
-      vm->regs[dst] = value;
+      int dst = function->code[frame->pc + 1U];
+      int value = function->code[frame->pc + 2U];
+      frame->regs[dst] = value;
+      frame->pc += 3U;
       break;
     }
 
     case BEET_BC_OP_STORE_LOCAL: {
-      int local_index = function->code[pc++];
-      int src = function->code[pc++];
-      vm->locals[local_index] = vm->regs[src];
+      int local_index = function->code[frame->pc + 1U];
+      int src = function->code[frame->pc + 2U];
+      frame->locals[local_index] = frame->regs[src];
+      frame->pc += 3U;
       break;
     }
 
     case BEET_BC_OP_LOAD_LOCAL: {
-      int dst = function->code[pc++];
-      int local_index = function->code[pc++];
-      vm->regs[dst] = vm->locals[local_index];
+      int dst = function->code[frame->pc + 1U];
+      int local_index = function->code[frame->pc + 2U];
+      frame->regs[dst] = frame->locals[local_index];
+      frame->pc += 3U;
+      break;
+    }
+
+    case BEET_BC_OP_CALL: {
+      const beet_bytecode_function *callee;
+      int dst = function->code[frame->pc + 1U];
+      int callee_index = function->code[frame->pc + 2U];
+      size_t arg_count = (size_t)function->code[frame->pc + 3U];
+      size_t i;
+      beet_vm_frame *callee_frame;
+
+      if (callee_index < 0 || (size_t)callee_index >= program->function_count) {
+        return 0;
+      }
+
+      callee = &program->functions[callee_index];
+      if (arg_count != callee->param_count || arg_count > BEET_VM_MAX_LOCALS) {
+        return 0;
+      }
+
+      frame->pc += 4U + arg_count;
+      if (!beet_vm_push_frame(vm, (size_t)callee_index, dst)) {
+        return 0;
+      }
+
+      callee_frame = beet_vm_current_frame(vm);
+      for (i = 0U; i < arg_count; ++i) {
+        int arg_temp = function->code[frame->pc - arg_count + i];
+        callee_frame->locals[i] = frame->regs[arg_temp];
+      }
       break;
     }
 
     case BEET_BC_OP_ADD_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = vm->regs[lhs] + vm->regs[rhs];
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = frame->regs[lhs] + frame->regs[rhs];
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_SUB_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = vm->regs[lhs] - vm->regs[rhs];
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = frame->regs[lhs] - frame->regs[rhs];
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_MUL_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = vm->regs[lhs] * vm->regs[rhs];
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = frame->regs[lhs] * frame->regs[rhs];
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_DIV_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      if (vm->regs[rhs] == 0) {
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      if (frame->regs[rhs] == 0) {
         return 0;
       }
-      vm->regs[dst] = vm->regs[lhs] / vm->regs[rhs];
+      frame->regs[dst] = frame->regs[lhs] / frame->regs[rhs];
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_EQ_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = (vm->regs[lhs] == vm->regs[rhs]) ? 1 : 0;
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = (frame->regs[lhs] == frame->regs[rhs]) ? 1 : 0;
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_NE_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = (vm->regs[lhs] != vm->regs[rhs]) ? 1 : 0;
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = (frame->regs[lhs] != frame->regs[rhs]) ? 1 : 0;
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_LT_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = (vm->regs[lhs] < vm->regs[rhs]) ? 1 : 0;
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = (frame->regs[lhs] < frame->regs[rhs]) ? 1 : 0;
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_LE_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = (vm->regs[lhs] <= vm->regs[rhs]) ? 1 : 0;
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = (frame->regs[lhs] <= frame->regs[rhs]) ? 1 : 0;
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_GT_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = (vm->regs[lhs] > vm->regs[rhs]) ? 1 : 0;
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = (frame->regs[lhs] > frame->regs[rhs]) ? 1 : 0;
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_GE_INT: {
-      int dst = function->code[pc++];
-      int lhs = function->code[pc++];
-      int rhs = function->code[pc++];
-      vm->regs[dst] = (vm->regs[lhs] >= vm->regs[rhs]) ? 1 : 0;
+      int dst = function->code[frame->pc + 1U];
+      int lhs = function->code[frame->pc + 2U];
+      int rhs = function->code[frame->pc + 3U];
+      frame->regs[dst] = (frame->regs[lhs] >= frame->regs[rhs]) ? 1 : 0;
+      frame->pc += 4U;
       break;
     }
 
     case BEET_BC_OP_LABEL:
-      pc += 1U;
+      frame->pc += 2U;
       break;
 
     case BEET_BC_OP_JUMP: {
-      int label_id = function->code[pc++];
-      if (!beet_vm_find_label_pc(function, label_id, &pc)) {
+      int label_id = function->code[frame->pc + 1U];
+      if (!beet_vm_find_label_pc(function, label_id, &frame->pc)) {
         return 0;
       }
       break;
     }
 
     case BEET_BC_OP_JUMP_IF_FALSE: {
-      int condition_temp = function->code[pc++];
-      int label_id = function->code[pc++];
-      if (vm->regs[condition_temp] == 0) {
-        if (!beet_vm_find_label_pc(function, label_id, &pc)) {
+      int condition_temp = function->code[frame->pc + 1U];
+      int label_id = function->code[frame->pc + 2U];
+      if (frame->regs[condition_temp] == 0) {
+        if (!beet_vm_find_label_pc(function, label_id, &frame->pc)) {
           return 0;
         }
+      } else {
+        frame->pc += 3U;
       }
       break;
     }
 
-    case BEET_BC_OP_RETURN_LOCAL: {
-      int local_index = function->code[pc++];
-      *out_result = vm->locals[local_index];
-      return 1;
-    }
-
-    case BEET_BC_OP_RETURN_TEMP: {
-      int temp = function->code[pc++];
-      *out_result = vm->regs[temp];
-      return 1;
-    }
-
+    case BEET_BC_OP_RETURN_LOCAL:
+    case BEET_BC_OP_RETURN_TEMP:
     case BEET_BC_OP_RETURN_CONST_INT: {
-      int value = function->code[pc++];
-      *out_result = value;
-      return 1;
+      beet_vm_frame returning_frame;
+      int value;
+
+      if (function->code[frame->pc] == BEET_BC_OP_RETURN_LOCAL) {
+        value = frame->locals[function->code[frame->pc + 1U]];
+      } else if (function->code[frame->pc] == BEET_BC_OP_RETURN_TEMP) {
+        value = frame->regs[function->code[frame->pc + 1U]];
+      } else {
+        value = function->code[frame->pc + 1U];
+      }
+
+      returning_frame = *frame;
+      vm->frame_count -= 1U;
+
+      if (vm->frame_count == 0U) {
+        *out_result = value;
+        return 1;
+      }
+
+      frame = beet_vm_current_frame(vm);
+      frame->regs[returning_frame.return_dest] = value;
+      break;
     }
 
     default:
@@ -230,4 +352,18 @@ int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
   }
 
   return 0;
+}
+
+int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
+                    int *out_result) {
+  beet_bytecode_program program;
+
+  assert(vm != NULL);
+  assert(function != NULL);
+  assert(out_result != NULL);
+
+  beet_bytecode_program_init(&program);
+  program.functions[0] = *function;
+  program.function_count = 1U;
+  return beet_vm_execute_program(vm, &program, 0U, out_result);
 }

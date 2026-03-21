@@ -180,6 +180,7 @@ void beet_mir_function_init(beet_mir_function *function, const char *name,
   beet_copy_name(function->name, name, name_len);
   function->instr_count = 0U;
   function->local_count = 0U;
+  function->param_count = 0U;
   function->next_temp = 0;
   function->next_label = 0;
 }
@@ -204,6 +205,7 @@ int beet_mir_add_const_int(beet_mir_function *function, int value) {
   instr->src_rhs = -1;
   instr->int_value = value;
   instr->name[0] = '\0';
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return temp;
@@ -231,6 +233,7 @@ int beet_mir_add_bind_local(beet_mir_function *function, const char *name,
   instr->src_rhs = -1;
   instr->int_value = 0;
   beet_copy_name(instr->name, name, name_len);
+  instr->arg_count = 0U;
 
   beet_copy_name(function->locals[function->local_count], name, name_len);
   function->local_count += 1U;
@@ -260,6 +263,7 @@ int beet_mir_add_load_local(beet_mir_function *function, const char *name,
   instr->src_rhs = -1;
   instr->int_value = 0;
   beet_copy_name(instr->name, name, name_len);
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return temp;
@@ -283,9 +287,48 @@ int beet_mir_add_store_local(beet_mir_function *function, const char *name,
   instr->src_rhs = -1;
   instr->int_value = 0;
   beet_copy_name(instr->name, name, name_len);
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return 1;
+}
+
+int beet_mir_add_call(beet_mir_function *function, const char *name,
+                      size_t name_len, const int *args, size_t arg_count) {
+  beet_mir_instr *instr;
+  size_t i;
+  int temp;
+
+  assert(function != NULL);
+  assert(name != NULL);
+  assert(args != NULL || arg_count == 0U);
+
+  if (arg_count > BEET_AST_MAX_PARAMS) {
+    return -1;
+  }
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return -1;
+  }
+
+  temp = function->next_temp;
+  function->next_temp += 1;
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = BEET_MIR_OP_CALL;
+  instr->dst = temp;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
+  instr->int_value = 0;
+  beet_copy_name(instr->name, name, name_len);
+  instr->arg_count = arg_count;
+
+  for (i = 0U; i < arg_count; ++i) {
+    instr->args[i] = args[i];
+  }
+
+  function->instr_count += 1U;
+  return temp;
 }
 
 int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
@@ -317,6 +360,7 @@ int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
   instr->src_rhs = rhs_temp;
   instr->int_value = 0;
   instr->name[0] = '\0';
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return temp;
@@ -348,6 +392,7 @@ int beet_mir_add_label(beet_mir_function *function, int label_id) {
   instr->src_rhs = -1;
   instr->int_value = label_id;
   instr->name[0] = '\0';
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return 1;
@@ -414,6 +459,7 @@ int beet_mir_add_return_local(beet_mir_function *function, const char *name,
   instr->src_rhs = -1;
   instr->int_value = 0;
   beet_copy_name(instr->name, name, name_len);
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return 1;
@@ -435,6 +481,7 @@ int beet_mir_add_return_temp(beet_mir_function *function, int temp) {
   instr->src_rhs = -1;
   instr->int_value = 0;
   instr->name[0] = '\0';
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return 1;
@@ -456,6 +503,7 @@ int beet_mir_add_return_const_int(beet_mir_function *function, int value) {
   instr->src_rhs = -1;
   instr->int_value = value;
   instr->name[0] = '\0';
+  instr->arg_count = 0U;
 
   function->instr_count += 1U;
   return 1;
@@ -521,6 +569,8 @@ beet_mir_register_param_locals(beet_mir_function *function,
   assert(function != NULL);
   assert(function_ast != NULL);
 
+  function->param_count = function_ast->param_count;
+
   for (i = 0U; i < function_ast->param_count; ++i) {
     if (function->local_count >= BEET_MIR_MAX_LOCALS) {
       return 0;
@@ -542,6 +592,8 @@ static int beet_mir_lower_expr(beet_mir_function *function,
   size_t local_name_len;
   int lhs_temp;
   int rhs_temp;
+  int arg_temps[BEET_AST_MAX_PARAMS];
+  size_t i;
 
   assert(function != NULL);
   assert(expr != NULL);
@@ -569,6 +621,22 @@ static int beet_mir_lower_expr(beet_mir_function *function,
 
   case BEET_AST_EXPR_NAME:
     *out_temp = beet_mir_add_load_local(function, expr->text, expr->text_len);
+    return *out_temp >= 0;
+
+  case BEET_AST_EXPR_CALL:
+    if (expr->arg_count > BEET_AST_MAX_PARAMS) {
+      return 0;
+    }
+
+    for (i = 0U; i < expr->arg_count; ++i) {
+      if (expr->args[i] == NULL ||
+          !beet_mir_lower_expr(function, expr->args[i], &arg_temps[i])) {
+        return 0;
+      }
+    }
+
+    *out_temp = beet_mir_add_call(function, expr->text, expr->text_len,
+                                  arg_temps, expr->arg_count);
     return *out_temp >= 0;
 
   case BEET_AST_EXPR_FIELD:

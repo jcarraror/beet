@@ -545,6 +545,56 @@ static void test_codegen_lowered_structure_binding_and_field_return(void) {
   beet_source_file_dispose(&decl_file);
 }
 
+static void test_codegen_program_function_call(void) {
+  const char *text = "function add1(x is Int) returns Int {\n"
+                     "    return x + 1\n"
+                     "}\n"
+                     "function main() returns Int {\n"
+                     "    return add1(41)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function functions[2];
+  beet_mir_function mir_functions[2];
+  beet_bytecode_program bytecode_program;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &functions[0]));
+  assert(beet_parser_parse_function(&parser, &functions[1]));
+  assert(beet_resolve_function_with_decls(&functions[0], functions, 2U));
+  assert(beet_resolve_function_with_decls(&functions[1], functions, 2U));
+  assert(beet_type_check_function_signature(&functions[0]));
+  assert(beet_type_check_function_signature(&functions[1]));
+  assert(beet_type_check_function_body_with_decls(&functions[0], NULL, 0U,
+                                                  functions, 2U));
+  assert(beet_type_check_function_body_with_decls(&functions[1], NULL, 0U,
+                                                  functions, 2U));
+  assert(beet_mir_lower_function(&mir_functions[0], &functions[0]));
+  assert(beet_mir_lower_function(&mir_functions[1], &functions[1]));
+  assert(beet_codegen_program(mir_functions, 2U, &bytecode_program));
+
+  assert(bytecode_program.function_count == 2U);
+  assert(bytecode_program.functions[0].param_count == 1U);
+  assert(bytecode_program.functions[0].local_count == 1U);
+  assert(bytecode_program.functions[1].param_count == 0U);
+  assert(bytecode_program.functions[1].code_count == 10U);
+  assert(bytecode_program.functions[1].code[0] == BEET_BC_OP_CONST_INT);
+  assert(bytecode_program.functions[1].code[1] == 0);
+  assert(bytecode_program.functions[1].code[2] == 41);
+  assert(bytecode_program.functions[1].code[3] == BEET_BC_OP_CALL);
+  assert(bytecode_program.functions[1].code[4] == 1);
+  assert(bytecode_program.functions[1].code[5] == 0);
+  assert(bytecode_program.functions[1].code[6] == 1);
+  assert(bytecode_program.functions[1].code[7] == 0);
+  assert(bytecode_program.functions[1].code[8] == BEET_BC_OP_RETURN_TEMP);
+  assert(bytecode_program.functions[1].code[9] == 1);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_codegen_binding();
   test_codegen_expression_binding();
@@ -559,5 +609,6 @@ int main(void) {
   test_codegen_lowered_while_statement();
   test_codegen_lowered_assignment_inside_if_statement();
   test_codegen_lowered_structure_binding_and_field_return();
+  test_codegen_program_function_call();
   return 0;
 }

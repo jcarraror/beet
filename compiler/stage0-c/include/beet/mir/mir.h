@@ -8,12 +8,14 @@
 #define BEET_MIR_MAX_INSTRS 256
 #define BEET_MIR_MAX_LOCALS 128
 #define BEET_MIR_MAX_NAME_LEN 64
+#define BEET_MIR_MAX_FUNCTIONS 32
 
 typedef enum beet_mir_opcode {
   BEET_MIR_OP_CONST_INT = 0,
   BEET_MIR_OP_BIND_LOCAL,
   BEET_MIR_OP_LOAD_LOCAL,
   BEET_MIR_OP_STORE_LOCAL,
+  BEET_MIR_OP_CALL,
   BEET_MIR_OP_ADD_INT,
   BEET_MIR_OP_SUB_INT,
   BEET_MIR_OP_MUL_INT,
@@ -39,6 +41,8 @@ typedef struct beet_mir_instr {
   int src_rhs;
   int int_value;
   char name[BEET_MIR_MAX_NAME_LEN];
+  int args[BEET_AST_MAX_PARAMS];
+  size_t arg_count;
 } beet_mir_instr;
 
 typedef struct beet_mir_function {
@@ -48,6 +52,7 @@ typedef struct beet_mir_function {
 
   char locals[BEET_MIR_MAX_LOCALS][BEET_MIR_MAX_NAME_LEN];
   size_t local_count;
+  size_t param_count;
 
   int next_temp;
   int next_label;
@@ -63,6 +68,8 @@ int beet_mir_add_load_local(beet_mir_function *function, const char *name,
                             size_t name_len);
 int beet_mir_add_store_local(beet_mir_function *function, const char *name,
                              size_t name_len, int src_temp);
+int beet_mir_add_call(beet_mir_function *function, const char *name,
+                      size_t name_len, const int *args, size_t arg_count);
 int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
                             int lhs_temp, int rhs_temp);
 int beet_mir_next_label(beet_mir_function *function);

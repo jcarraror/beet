@@ -633,6 +633,49 @@ static void test_lower_structure_binding_and_field_return(void) {
   beet_source_file_dispose(&decl_file);
 }
 
+static void test_lower_function_call_expression(void) {
+  const char *text = "function add1(x is Int) returns Int {\n"
+                     "    return x + 1\n"
+                     "}\n"
+                     "function main() returns Int {\n"
+                     "    return add1(41)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function functions[2];
+  beet_mir_function mir_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &functions[0]));
+  assert(beet_parser_parse_function(&parser, &functions[1]));
+  assert(beet_resolve_function_with_decls(&functions[0], functions, 2U));
+  assert(beet_resolve_function_with_decls(&functions[1], functions, 2U));
+  assert(beet_type_check_function_signature(&functions[0]));
+  assert(beet_type_check_function_signature(&functions[1]));
+  assert(beet_type_check_function_body_with_decls(&functions[0], NULL, 0U,
+                                                  functions, 2U));
+  assert(beet_type_check_function_body_with_decls(&functions[1], NULL, 0U,
+                                                  functions, 2U));
+  assert(beet_mir_lower_function(&mir_function, &functions[1]));
+
+  assert(mir_function.instr_count == 3U);
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[0].dst == 0);
+  assert(mir_function.instrs[0].int_value == 41);
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_CALL);
+  assert(mir_function.instrs[1].dst == 1);
+  assert(strcmp(mir_function.instrs[1].name, "add1") == 0);
+  assert(mir_function.instrs[1].arg_count == 1U);
+  assert(mir_function.instrs[1].args[0] == 0);
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_RETURN_TEMP);
+  assert(mir_function.instrs[2].dst == 1);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_lower_binding_to_mir();
   test_lower_mutable_binding_to_mir();
@@ -649,5 +692,6 @@ int main(void) {
   test_lower_if_else_statement_with_bool_param();
   test_lower_assignment_inside_if_statement();
   test_lower_structure_binding_and_field_return();
+  test_lower_function_call_expression();
   return 0;
 }
