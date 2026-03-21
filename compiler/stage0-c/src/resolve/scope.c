@@ -318,6 +318,39 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
       }
       break;
 
+    case BEET_AST_STMT_MATCH: {
+      size_t case_index;
+
+      if (!beet_resolve_expr(stack, &stmt->match_expr, function_decls,
+                             function_count)) {
+        return 0;
+      }
+
+      for (case_index = 0U; case_index < stmt->match_case_count; ++case_index) {
+        beet_ast_match_case *match_case = &stmt->match_cases[case_index];
+
+        if (!beet_scope_enter(stack)) {
+          return 0;
+        }
+        if (match_case->binds_payload &&
+            !beet_scope_bind_slice(stack, match_case->binding_name,
+                                   match_case->binding_name_len, 0)) {
+          (void)beet_scope_leave(stack);
+          return 0;
+        }
+        if (!beet_resolve_stmt_list(stack, match_case->body,
+                                    match_case->body_count, function_decls,
+                                    function_count)) {
+          (void)beet_scope_leave(stack);
+          return 0;
+        }
+        if (!beet_scope_leave(stack)) {
+          return 0;
+        }
+      }
+      break;
+    }
+
     default:
       return 0;
     }

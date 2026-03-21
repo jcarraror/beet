@@ -104,6 +104,7 @@ run_valgrind_tests() {
         valgrind \
             --quiet \
             --error-exitcode=1 \
+            --max-stackframe="${BEET_VALGRIND_MAX_STACKFRAME:-8388608}" \
             --leak-check=full \
             --show-leak-kinds=definite,possible \
             --errors-for-leak-kinds=definite,possible \

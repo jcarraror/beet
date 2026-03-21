@@ -580,6 +580,67 @@ static void test_choice_construction_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_match_statement_function(void) {
+  const char *text = "function choose(value is MaybeInt) returns Int {\n"
+                     "    match value {\n"
+                     "        case none {\n"
+                     "            return 0\n"
+                     "        }\n"
+                     "        case some(item) {\n"
+                     "            return item\n"
+                     "        }\n"
+                     "    }\n"
+                     "    return 1\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 2U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_MATCH);
+  assert(function_ast.body[0].match_expr.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].match_expr.text_len == 5U);
+  assert(strncmp(function_ast.body[0].match_expr.text, "value", 5) == 0);
+  assert(function_ast.body[0].match_case_count == 2U);
+
+  assert(function_ast.body[0].match_cases[0].variant_name_len == 4U);
+  assert(strncmp(function_ast.body[0].match_cases[0].variant_name, "none", 4) ==
+         0);
+  assert(function_ast.body[0].match_cases[0].binds_payload == 0);
+  assert(function_ast.body[0].match_cases[0].body_count == 1U);
+  assert(function_ast.body[0].match_cases[0].body != NULL);
+  assert(function_ast.body[0].match_cases[0].body[0].kind ==
+         BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].match_cases[0].body[0].expr.kind ==
+         BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[0].match_cases[0].body[0].expr.text, "0",
+                 1) == 0);
+
+  assert(function_ast.body[0].match_cases[1].variant_name_len == 4U);
+  assert(strncmp(function_ast.body[0].match_cases[1].variant_name, "some", 4) ==
+         0);
+  assert(function_ast.body[0].match_cases[1].binds_payload == 1);
+  assert(function_ast.body[0].match_cases[1].binding_name_len == 4U);
+  assert(strncmp(function_ast.body[0].match_cases[1].binding_name, "item", 4) ==
+         0);
+  assert(function_ast.body[0].match_cases[1].body_count == 1U);
+  assert(function_ast.body[0].match_cases[1].body != NULL);
+  assert(function_ast.body[0].match_cases[1].body[0].kind ==
+         BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].match_cases[1].body[0].expr.kind ==
+         BEET_AST_EXPR_NAME);
+  assert(strncmp(function_ast.body[0].match_cases[1].body[0].expr.text, "item",
+                 4) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_empty_function();
   test_function_with_params();
@@ -597,5 +658,6 @@ int main(void) {
   test_function_call_expression_function();
   test_structure_construction_and_field_access_function();
   test_choice_construction_function();
+  test_match_statement_function();
   return 0;
 }

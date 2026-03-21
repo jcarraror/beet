@@ -1022,6 +1022,204 @@ test_function_body_choice_construction_rejects_payload_on_empty_variant(void) {
   beet_source_file_dispose(&decl_file);
 }
 
+static void test_match_statement_choice_ok(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text =
+      "function choose(value is MaybeInt) returns Int {\n"
+      "    match value {\n"
+      "        case none {\n"
+      "            return 0\n"
+      "        }\n"
+      "        case some(item) {\n"
+      "            return item\n"
+      "        }\n"
+      "    }\n"
+      "    return 1\n"
+      "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "choose.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void test_match_statement_rejects_non_choice_scrutinee(void) {
+  const char *text = "function choose(value is Int) returns Int {\n"
+                     "    match value {\n"
+                     "        case none {\n"
+                     "            return 0\n"
+                     "        }\n"
+                     "    }\n"
+                     "    return 1\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(!beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_match_statement_rejects_unknown_variant(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text =
+      "function choose(value is MaybeInt) returns Int {\n"
+      "    match value {\n"
+      "        case other {\n"
+      "            return 0\n"
+      "        }\n"
+      "    }\n"
+      "    return 1\n"
+      "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "choose.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(!beet_type_check_function_body_with_type_decls(&function_ast,
+                                                        &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void test_match_statement_rejects_payload_bind_on_empty_variant(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text =
+      "function choose(value is MaybeInt) returns Int {\n"
+      "    match value {\n"
+      "        case none(item) {\n"
+      "            return 0\n"
+      "        }\n"
+      "    }\n"
+      "    return 1\n"
+      "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "choose.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(!beet_type_check_function_body_with_type_decls(&function_ast,
+                                                        &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void test_match_statement_rejects_duplicate_variants(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text =
+      "function choose(value is MaybeInt) returns Int {\n"
+      "    match value {\n"
+      "        case none {\n"
+      "            return 0\n"
+      "        }\n"
+      "        case none {\n"
+      "            return 1\n"
+      "        }\n"
+      "    }\n"
+      "    return 2\n"
+      "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "choose.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(!beet_type_check_function_body_with_type_decls(&function_ast,
+                                                        &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 int main(void) {
   test_infer_int_binding();
   test_infer_bool_binding();
@@ -1060,6 +1258,11 @@ int main(void) {
   test_function_body_choice_construction_rejects_payload_on_empty_variant();
   test_function_call_body_ok();
   test_function_call_rejects_argument_type_mismatch();
+  test_match_statement_choice_ok();
+  test_match_statement_rejects_non_choice_scrutinee();
+  test_match_statement_rejects_unknown_variant();
+  test_match_statement_rejects_payload_bind_on_empty_variant();
+  test_match_statement_rejects_duplicate_variants();
   test_if_condition_bool_ok();
   test_if_condition_rejects_non_bool();
   test_while_condition_bool_ok();

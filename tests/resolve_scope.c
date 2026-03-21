@@ -394,6 +394,69 @@ static void test_resolve_name_inside_choice_construction(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_resolve_match_payload_binding(void) {
+  const char *text = "function choose(value is MaybeInt) returns Int {\n"
+                     "    match value {\n"
+                     "        case none {\n"
+                     "            return 0\n"
+                     "        }\n"
+                     "        case some(item) {\n"
+                     "            return item\n"
+                     "        }\n"
+                     "    }\n"
+                     "    return 1\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(function_ast.body[0].kind == BEET_AST_STMT_MATCH);
+  assert(function_ast.body[0].match_expr.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].match_expr.is_resolved == 1);
+  assert(function_ast.body[0].match_expr.resolved_depth == 0U);
+  assert(function_ast.body[0].match_cases[1].body_count == 1U);
+  assert(function_ast.body[0].match_cases[1].body[0].expr.kind ==
+         BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].match_cases[1].body[0].expr.is_resolved == 1);
+  assert(function_ast.body[0].match_cases[1].body[0].expr.resolved_depth == 1U);
+  assert(function_ast.body[0].match_cases[1].body[0].expr.resolved_is_mutable ==
+         0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_reject_match_payload_binding_escape(void) {
+  const char *text = "function choose(value is MaybeInt) returns Int {\n"
+                     "    match value {\n"
+                     "        case none {\n"
+                     "            return 0\n"
+                     "        }\n"
+                     "        case some(item) {\n"
+                     "            return item\n"
+                     "        }\n"
+                     "    }\n"
+                     "    return item\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(!beet_resolve_function(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_bind_and_lookup();
   test_reject_duplicate_in_same_scope();
@@ -409,8 +472,10 @@ int main(void) {
   test_resolve_if_condition_bool_literal();
   test_resolve_function_call_against_decl_set();
   test_resolve_name_inside_choice_construction();
+  test_resolve_match_payload_binding();
   test_reject_missing_return_name();
   test_reject_missing_called_function();
   test_reject_missing_assignment_target();
+  test_reject_match_payload_binding_escape();
   return 0;
 }

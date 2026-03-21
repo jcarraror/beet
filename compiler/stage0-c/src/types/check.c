@@ -614,6 +614,85 @@ static int beet_type_check_stmt_list(
       break;
     }
 
+    case BEET_AST_STMT_MATCH: {
+      beet_type scrutinee_type;
+      const beet_ast_type_decl *type_decl;
+      size_t case_index;
+
+      scrutinee_type = beet_type_check_expr(
+          &stmt->match_expr, locals, *local_count, type_decls, decl_count,
+          function_decls, function_count);
+      if (scrutinee_type.kind != BEET_TYPE_NAMED) {
+        return 0;
+      }
+
+      type_decl = beet_find_type_decl(
+          type_decls, decl_count, scrutinee_type.name, scrutinee_type.name_len);
+      if (type_decl == NULL || !type_decl->is_choice ||
+          stmt->match_case_count == 0U) {
+        return 0;
+      }
+
+      for (case_index = 0U; case_index < stmt->match_case_count; ++case_index) {
+        const beet_ast_match_case *match_case = &stmt->match_cases[case_index];
+        const beet_ast_choice_variant *variant_decl;
+        beet_local_type case_locals[BEET_TYPE_CHECK_MAX_LOCALS];
+        size_t case_local_count;
+        size_t duplicate_index;
+
+        for (duplicate_index = case_index + 1U;
+             duplicate_index < stmt->match_case_count; ++duplicate_index) {
+          if (beet_name_equals_slice(
+                  match_case->variant_name, match_case->variant_name_len,
+                  stmt->match_cases[duplicate_index].variant_name,
+                  stmt->match_cases[duplicate_index].variant_name_len)) {
+            return 0;
+          }
+        }
+
+        variant_decl = beet_find_choice_variant(
+            type_decl, match_case->variant_name, match_case->variant_name_len);
+        if (variant_decl == NULL) {
+          return 0;
+        }
+
+        memcpy(case_locals, locals, sizeof(beet_local_type) * (*local_count));
+        case_local_count = *local_count;
+
+        if (match_case->binds_payload) {
+          beet_type payload_type;
+
+          if (!variant_decl->has_payload ||
+              case_local_count >= BEET_TYPE_CHECK_MAX_LOCALS) {
+            return 0;
+          }
+
+          payload_type = beet_type_from_name_slice_in_context(
+              variant_decl->payload_type_name,
+              variant_decl->payload_type_name_len, type_decls, decl_count);
+          if (!beet_type_is_valid(&payload_type)) {
+            return 0;
+          }
+
+          case_locals[case_local_count].name = match_case->binding_name;
+          case_locals[case_local_count].name_len = match_case->binding_name_len;
+          case_locals[case_local_count].type = payload_type;
+          case_locals[case_local_count].is_mutable = 0;
+          case_local_count += 1U;
+        } else if (variant_decl->has_payload) {
+          /* allow ignoring payloads in minimal match */
+        }
+
+        if (!beet_type_check_stmt_list(
+                match_case->body, match_case->body_count, return_type,
+                case_locals, &case_local_count, type_decls, decl_count,
+                function_decls, function_count)) {
+          return 0;
+        }
+      }
+      break;
+    }
+
     default:
       return 0;
     }

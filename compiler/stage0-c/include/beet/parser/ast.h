@@ -99,8 +99,21 @@ typedef enum beet_ast_stmt_kind {
   BEET_AST_STMT_ASSIGNMENT,
   BEET_AST_STMT_RETURN,
   BEET_AST_STMT_IF,
-  BEET_AST_STMT_WHILE
+  BEET_AST_STMT_WHILE,
+  BEET_AST_STMT_MATCH
 } beet_ast_stmt_kind;
+
+typedef struct beet_ast_match_case {
+  const char *variant_name;
+  size_t variant_name_len;
+
+  int binds_payload;
+  const char *binding_name;
+  size_t binding_name_len;
+
+  struct beet_ast_stmt *body;
+  size_t body_count;
+} beet_ast_match_case;
 
 typedef struct beet_ast_stmt {
   beet_ast_stmt_kind kind;
@@ -108,6 +121,9 @@ typedef struct beet_ast_stmt {
   beet_ast_assignment assignment;
   beet_ast_expr expr;
   beet_ast_expr condition;
+  beet_ast_expr match_expr;
+  beet_ast_match_case match_cases[BEET_AST_MAX_VARIANTS];
+  size_t match_case_count;
   struct beet_ast_stmt *then_body;
   size_t then_body_count;
   struct beet_ast_stmt *else_body;

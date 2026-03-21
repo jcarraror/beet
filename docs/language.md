@@ -58,7 +58,10 @@ while condition {
 }
 
 match value {
-    case pattern {
+    case none {
+        ...
+    }
+    case some(item) {
         ...
     }
 }
