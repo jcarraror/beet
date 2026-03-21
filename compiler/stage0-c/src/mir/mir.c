@@ -67,41 +67,18 @@ typedef struct beet_mir_lower_context {
 static const beet_ast_type_decl *
 beet_mir_find_type_decl(const beet_ast_type_decl *type_decls, size_t decl_count,
                         const char *name, size_t name_len) {
-  size_t i;
+  beet_decl_registry registry;
 
-  assert(type_decls != NULL || decl_count == 0U);
-  assert(name != NULL);
-
-  for (i = 0U; i < decl_count; ++i) {
-    if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len, name,
-                               name_len)) {
-      return &type_decls[i];
-    }
-  }
-
-  return NULL;
+  beet_decl_registry_init(&registry, type_decls, decl_count, NULL, 0U);
+  return beet_decl_registry_find_type(&registry, name, name_len);
 }
 
 static int
 beet_mir_find_choice_variant_index(const beet_ast_type_decl *type_decl,
                                    const char *name, size_t name_len,
                                    size_t *out_index) {
-  size_t i;
-
-  assert(type_decl != NULL);
-  assert(name != NULL);
-  assert(out_index != NULL);
-
-  for (i = 0U; i < type_decl->variant_count; ++i) {
-    if (beet_name_equals_slice(type_decl->variants[i].name,
-                               type_decl->variants[i].name_len, name,
-                               name_len)) {
-      *out_index = i;
-      return 1;
-    }
-  }
-
-  return 0;
+  return beet_decl_registry_find_choice_variant_index(type_decl, name, name_len,
+                                                      out_index);
 }
 
 static int beet_mir_context_bind_local_type(beet_mir_lower_context *ctx,
@@ -1539,6 +1516,15 @@ int beet_mir_lower_function_with_type_decls(
 
   return beet_mir_lower_stmt_list(&ctx, function_ast->body,
                                   function_ast->body_count);
+}
+
+int beet_mir_lower_function_with_registry(beet_mir_function *function,
+                                          const beet_ast_function *function_ast,
+                                          const beet_decl_registry *registry) {
+  assert(registry != NULL);
+
+  return beet_mir_lower_function_with_type_decls(
+      function, function_ast, registry->type_decls, registry->type_decl_count);
 }
 
 int beet_mir_lower_function(beet_mir_function *function,

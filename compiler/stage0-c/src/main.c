@@ -7,6 +7,7 @@
 #include "beet/mir/mir.h"
 #include "beet/parser/parser.h"
 #include "beet/resolve/scope.h"
+#include "beet/semantics/registry.h"
 #include "beet/support/source.h"
 #include "beet/types/check.h"
 #include "beet/vm/interpreter.h"
@@ -51,6 +52,7 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
   static beet_ast_function functions[BEET_DRIVER_MAX_FUNCTIONS];
   static beet_mir_function mir_functions[BEET_DRIVER_MAX_FUNCTIONS];
   static beet_bytecode_program bytecode_program;
+  beet_decl_registry registry;
   beet_vm vm;
   size_t type_decl_count;
   size_t function_count;
@@ -123,15 +125,18 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
     return 0;
   }
 
-  if (!beet_type_check_type_decls(type_decls, type_decl_count)) {
+  beet_decl_registry_init(&registry, type_decls, type_decl_count, functions,
+                          function_count);
+
+  if (!beet_type_check_type_decls_with_registry(&registry)) {
     fprintf(stderr, "error: invalid type declarations in '%s'\n", path);
     beet_source_file_dispose(&file);
     return 0;
   }
 
   for (i = 0U; i < function_count; ++i) {
-    if (!beet_type_check_function_signature_with_type_decls(
-            &functions[i], type_decls, type_decl_count)) {
+    if (!beet_type_check_function_signature_with_registry(&functions[i],
+                                                          &registry)) {
       fprintf(stderr, "error: invalid function signature in '%s'\n", path);
       beet_source_file_dispose(&file);
       return 0;
@@ -139,8 +144,7 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
   }
 
   for (i = 0U; i < function_count; ++i) {
-    if (!beet_resolve_function_with_decls(&functions[i], functions,
-                                          function_count)) {
+    if (!beet_resolve_function_with_registry(&functions[i], &registry)) {
       fprintf(stderr, "error: failed to resolve function names in '%s'\n",
               path);
       beet_source_file_dispose(&file);
@@ -149,9 +153,8 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
   }
 
   for (i = 0U; i < function_count; ++i) {
-    if (!beet_type_check_function_body_with_decls(&functions[i], type_decls,
-                                                  type_decl_count, functions,
-                                                  function_count)) {
+    if (!beet_type_check_function_body_with_registry(&functions[i],
+                                                     &registry)) {
       fprintf(stderr, "error: invalid function body types in '%s'\n", path);
       beet_source_file_dispose(&file);
       return 0;
@@ -159,8 +162,8 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
   }
 
   for (i = 0U; i < function_count; ++i) {
-    if (!beet_mir_lower_function_with_type_decls(
-            &mir_functions[i], &functions[i], type_decls, type_decl_count)) {
+    if (!beet_mir_lower_function_with_registry(&mir_functions[i], &functions[i],
+                                               &registry)) {
       fprintf(stderr, "error: failed to lower function to MIR\n");
       beet_source_file_dispose(&file);
       return 0;

@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "beet/parser/ast.h"
+#include "beet/semantics/registry.h"
 
 #define BEET_SCOPE_MAX_SYMBOLS 256
 #define BEET_SCOPE_MAX_STACK 32
@@ -40,6 +41,8 @@ const beet_symbol *beet_scope_lookup_slice(const beet_scope_stack *stack,
 int beet_resolve_function_with_decls(beet_ast_function *function_ast,
                                      const beet_ast_function *function_decls,
                                      size_t function_count);
+int beet_resolve_function_with_registry(beet_ast_function *function_ast,
+                                        const beet_decl_registry *registry);
 int beet_resolve_function(beet_ast_function *function_ast);
 
 #endif

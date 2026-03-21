@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "beet/parser/ast.h"
+#include "beet/semantics/registry.h"
 
 #define BEET_MIR_MAX_INSTRS 256
 #define BEET_MIR_MAX_LOCALS 128
@@ -91,6 +92,9 @@ int beet_mir_lower_trivial_return_function(
 int beet_mir_lower_function_with_type_decls(
     beet_mir_function *function, const beet_ast_function *function_ast,
     const beet_ast_type_decl *type_decls, size_t decl_count);
+int beet_mir_lower_function_with_registry(beet_mir_function *function,
+                                          const beet_ast_function *function_ast,
+                                          const beet_decl_registry *registry);
 
 int beet_mir_lower_function(beet_mir_function *function,
                             const beet_ast_function *function_ast);

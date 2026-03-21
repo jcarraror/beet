@@ -20,6 +20,7 @@ add_library(beet_compiler_support
     compiler/stage0-c/src/diag/diag.c
     compiler/stage0-c/src/lexer/lexer.c
     compiler/stage0-c/src/parser/parser.c
+    compiler/stage0-c/src/semantics/registry.c
     compiler/stage0-c/src/resolve/scope.c
     compiler/stage0-c/src/types/types.c
     compiler/stage0-c/src/types/check.c
@@ -101,6 +102,11 @@ add_executable(test_resolve_scope
 )
 target_link_libraries(test_resolve_scope PRIVATE beet_compiler_support)
 
+add_executable(test_semantic_registry
+    tests/semantic_registry.c
+)
+target_link_libraries(test_semantic_registry PRIVATE beet_compiler_support)
+
 add_executable(test_types_check
     tests/types_check.c
 )
@@ -130,6 +136,7 @@ add_test(NAME parser_binding COMMAND test_parser_binding)
 add_test(NAME parser_function COMMAND test_parser_function)
 add_test(NAME parser_type_decl COMMAND test_parser_type_decl)
 add_test(NAME resolve_scope COMMAND test_resolve_scope)
+add_test(NAME semantic_registry COMMAND test_semantic_registry)
 add_test(NAME types_check COMMAND test_types_check)
 add_test(NAME mir_lowering COMMAND test_mir_lowering)
 add_test(NAME codegen_bytecode COMMAND test_codegen_bytecode)

@@ -96,27 +96,6 @@ const beet_symbol *beet_scope_lookup_slice(const beet_scope_stack *stack,
   return NULL;
 }
 
-static int
-beet_find_function_decl_index(const beet_ast_function *function_decls,
-                              size_t function_count, const char *name,
-                              size_t name_len, size_t *out_index) {
-  size_t i;
-
-  assert(function_decls != NULL || function_count == 0U);
-  assert(name != NULL);
-  assert(out_index != NULL);
-
-  for (i = 0U; i < function_count; ++i) {
-    if (beet_name_equals_slice(function_decls[i].name,
-                               function_decls[i].name_len, name, name_len)) {
-      *out_index = i;
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
 static int beet_resolve_assignment(beet_scope_stack *stack,
                                    beet_ast_assignment *assignment) {
   const beet_symbol *symbol;
@@ -137,13 +116,12 @@ static int beet_resolve_assignment(beet_scope_stack *stack,
 }
 
 static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr,
-                             const beet_ast_function *function_decls,
-                             size_t function_count) {
+                             const beet_decl_registry *registry) {
   const beet_symbol *symbol;
 
   assert(stack != NULL);
   assert(expr != NULL);
-  assert(function_decls != NULL || function_count == 0U);
+  assert(registry != NULL);
 
   switch (expr->kind) {
   case BEET_AST_EXPR_INT_LITERAL:
@@ -165,9 +143,8 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr,
     size_t i;
     size_t target_index;
 
-    if (!beet_find_function_decl_index(function_decls, function_count,
-                                       expr->text, expr->text_len,
-                                       &target_index)) {
+    if (!beet_decl_registry_find_function_index(
+            registry, expr->text, expr->text_len, &target_index)) {
       return 0;
     }
 
@@ -178,8 +155,7 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr,
       if (expr->args[i] == NULL) {
         return 0;
       }
-      if (!beet_resolve_expr(stack, expr->args[i], function_decls,
-                             function_count)) {
+      if (!beet_resolve_expr(stack, expr->args[i], registry)) {
         return 0;
       }
     }
@@ -191,8 +167,7 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr,
 
     for (i = 0U; i < expr->field_init_count; ++i) {
       if (expr->field_inits[i].value != NULL &&
-          !beet_resolve_expr(stack, expr->field_inits[i].value, function_decls,
-                             function_count)) {
+          !beet_resolve_expr(stack, expr->field_inits[i].value, registry)) {
         return 0;
       }
     }
@@ -203,22 +178,20 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr,
     if (expr->left == NULL) {
       return 0;
     }
-    return beet_resolve_expr(stack, expr->left, function_decls, function_count);
+    return beet_resolve_expr(stack, expr->left, registry);
 
   case BEET_AST_EXPR_UNARY:
     if (expr->left == NULL) {
       return 0;
     }
-    return beet_resolve_expr(stack, expr->left, function_decls, function_count);
+    return beet_resolve_expr(stack, expr->left, registry);
 
   case BEET_AST_EXPR_BINARY:
     if (expr->left == NULL || expr->right == NULL) {
       return 0;
     }
-    return beet_resolve_expr(stack, expr->left, function_decls,
-                             function_count) &&
-           beet_resolve_expr(stack, expr->right, function_decls,
-                             function_count);
+    return beet_resolve_expr(stack, expr->left, registry) &&
+           beet_resolve_expr(stack, expr->right, registry);
 
   default:
     return 0;
@@ -227,21 +200,19 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr,
 
 static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
                                   size_t stmt_count,
-                                  const beet_ast_function *function_decls,
-                                  size_t function_count) {
+                                  const beet_decl_registry *registry) {
   size_t i;
 
   assert(stack != NULL);
   assert(stmts != NULL || stmt_count == 0U);
-  assert(function_decls != NULL || function_count == 0U);
+  assert(registry != NULL);
 
   for (i = 0U; i < stmt_count; ++i) {
     beet_ast_stmt *stmt = &stmts[i];
 
     switch (stmt->kind) {
     case BEET_AST_STMT_BINDING:
-      if (!beet_resolve_expr(stack, &stmt->binding.expr, function_decls,
-                             function_count)) {
+      if (!beet_resolve_expr(stack, &stmt->binding.expr, registry)) {
         return 0;
       }
       if (!beet_scope_bind_slice(stack, stmt->binding.name,
@@ -255,29 +226,26 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
       if (!beet_resolve_assignment(stack, &stmt->assignment)) {
         return 0;
       }
-      if (!beet_resolve_expr(stack, &stmt->expr, function_decls,
-                             function_count)) {
+      if (!beet_resolve_expr(stack, &stmt->expr, registry)) {
         return 0;
       }
       break;
 
     case BEET_AST_STMT_RETURN:
-      if (!beet_resolve_expr(stack, &stmt->expr, function_decls,
-                             function_count)) {
+      if (!beet_resolve_expr(stack, &stmt->expr, registry)) {
         return 0;
       }
       break;
 
     case BEET_AST_STMT_IF:
-      if (!beet_resolve_expr(stack, &stmt->condition, function_decls,
-                             function_count)) {
+      if (!beet_resolve_expr(stack, &stmt->condition, registry)) {
         return 0;
       }
       if (!beet_scope_enter(stack)) {
         return 0;
       }
       if (!beet_resolve_stmt_list(stack, stmt->then_body, stmt->then_body_count,
-                                  function_decls, function_count)) {
+                                  registry)) {
         (void)beet_scope_leave(stack);
         return 0;
       }
@@ -289,8 +257,7 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
           return 0;
         }
         if (!beet_resolve_stmt_list(stack, stmt->else_body,
-                                    stmt->else_body_count, function_decls,
-                                    function_count)) {
+                                    stmt->else_body_count, registry)) {
           (void)beet_scope_leave(stack);
           return 0;
         }
@@ -301,15 +268,14 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
       break;
 
     case BEET_AST_STMT_WHILE:
-      if (!beet_resolve_expr(stack, &stmt->condition, function_decls,
-                             function_count)) {
+      if (!beet_resolve_expr(stack, &stmt->condition, registry)) {
         return 0;
       }
       if (!beet_scope_enter(stack)) {
         return 0;
       }
       if (!beet_resolve_stmt_list(stack, stmt->loop_body, stmt->loop_body_count,
-                                  function_decls, function_count)) {
+                                  registry)) {
         (void)beet_scope_leave(stack);
         return 0;
       }
@@ -321,8 +287,7 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
     case BEET_AST_STMT_MATCH: {
       size_t case_index;
 
-      if (!beet_resolve_expr(stack, &stmt->match_expr, function_decls,
-                             function_count)) {
+      if (!beet_resolve_expr(stack, &stmt->match_expr, registry)) {
         return 0;
       }
 
@@ -339,8 +304,7 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
           return 0;
         }
         if (!beet_resolve_stmt_list(stack, match_case->body,
-                                    match_case->body_count, function_decls,
-                                    function_count)) {
+                                    match_case->body_count, registry)) {
           (void)beet_scope_leave(stack);
           return 0;
         }
@@ -359,14 +323,13 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
   return 1;
 }
 
-int beet_resolve_function_with_decls(beet_ast_function *function_ast,
-                                     const beet_ast_function *function_decls,
-                                     size_t function_count) {
+int beet_resolve_function_with_registry(beet_ast_function *function_ast,
+                                        const beet_decl_registry *registry) {
   beet_scope_stack stack;
   size_t i;
 
   assert(function_ast != NULL);
-  assert(function_decls != NULL || function_count == 0U);
+  assert(registry != NULL);
 
   beet_scope_stack_init(&stack);
 
@@ -378,8 +341,16 @@ int beet_resolve_function_with_decls(beet_ast_function *function_ast,
   }
 
   return beet_resolve_stmt_list(&stack, function_ast->body,
-                                function_ast->body_count, function_decls,
-                                function_count);
+                                function_ast->body_count, registry);
+}
+
+int beet_resolve_function_with_decls(beet_ast_function *function_ast,
+                                     const beet_ast_function *function_decls,
+                                     size_t function_count) {
+  beet_decl_registry registry;
+
+  beet_decl_registry_init(&registry, NULL, 0U, function_decls, function_count);
+  return beet_resolve_function_with_registry(function_ast, &registry);
 }
 
 int beet_resolve_function(beet_ast_function *function_ast) {

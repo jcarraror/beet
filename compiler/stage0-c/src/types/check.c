@@ -73,38 +73,20 @@ static int beet_type_equals(const beet_type *left, const beet_type *right) {
 static const beet_ast_type_decl *
 beet_find_type_decl(const beet_ast_type_decl *type_decls, size_t decl_count,
                     const char *name, size_t name_len) {
-  size_t i;
+  beet_decl_registry registry;
 
-  assert(type_decls != NULL || decl_count == 0U);
-  assert(name != NULL);
-
-  for (i = 0U; i < decl_count; ++i) {
-    if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len, name,
-                               name_len)) {
-      return &type_decls[i];
-    }
-  }
-
-  return NULL;
+  beet_decl_registry_init(&registry, type_decls, decl_count, NULL, 0U);
+  return beet_decl_registry_find_type(&registry, name, name_len);
 }
 
 static const beet_ast_function *
 beet_find_function_decl(const beet_ast_function *function_decls,
                         size_t function_count, const char *name,
                         size_t name_len) {
-  size_t i;
+  beet_decl_registry registry;
 
-  assert(function_decls != NULL || function_count == 0U);
-  assert(name != NULL);
-
-  for (i = 0U; i < function_count; ++i) {
-    if (beet_name_equals_slice(function_decls[i].name,
-                               function_decls[i].name_len, name, name_len)) {
-      return &function_decls[i];
-    }
-  }
-
-  return NULL;
+  beet_decl_registry_init(&registry, NULL, 0U, function_decls, function_count);
+  return beet_decl_registry_find_function(&registry, name, name_len);
 }
 
 static beet_type
@@ -735,6 +717,14 @@ int beet_type_check_function_signature_with_type_decls(
   return 1;
 }
 
+int beet_type_check_function_signature_with_registry(
+    const beet_ast_function *function_ast, const beet_decl_registry *registry) {
+  assert(registry != NULL);
+
+  return beet_type_check_function_signature_with_type_decls(
+      function_ast, registry->type_decls, registry->type_decl_count);
+}
+
 int beet_type_check_function_signature(const beet_ast_function *function_ast) {
   return beet_type_check_function_signature_with_type_decls(function_ast, NULL,
                                                             0U);
@@ -786,6 +776,15 @@ int beet_type_check_function_body_with_type_decls(
     size_t decl_count) {
   return beet_type_check_function_body_with_decls(function_ast, type_decls,
                                                   decl_count, NULL, 0U);
+}
+
+int beet_type_check_function_body_with_registry(
+    const beet_ast_function *function_ast, const beet_decl_registry *registry) {
+  assert(registry != NULL);
+
+  return beet_type_check_function_body_with_decls(
+      function_ast, registry->type_decls, registry->type_decl_count,
+      registry->function_decls, registry->function_count);
 }
 
 int beet_type_check_function_body(const beet_ast_function *function_ast) {
@@ -981,4 +980,12 @@ int beet_type_check_type_decls(const beet_ast_type_decl *type_decls,
   }
 
   return 1;
+}
+
+int beet_type_check_type_decls_with_registry(
+    const beet_decl_registry *registry) {
+  assert(registry != NULL);
+
+  return beet_type_check_type_decls(registry->type_decls,
+                                    registry->type_decl_count);
 }
