@@ -66,6 +66,10 @@ typedef struct beet_ast_binding {
 typedef struct beet_ast_assignment {
   const char *name;
   size_t name_len;
+
+  int is_resolved;
+  size_t resolved_depth;
+  int resolved_is_mutable;
 } beet_ast_assignment;
 
 typedef enum beet_ast_stmt_kind {

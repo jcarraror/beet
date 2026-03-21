@@ -145,6 +145,9 @@ static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
   stmt->binding.value_len = 0U;
   stmt->assignment.name = NULL;
   stmt->assignment.name_len = 0U;
+  stmt->assignment.is_resolved = 0;
+  stmt->assignment.resolved_depth = 0U;
+  stmt->assignment.resolved_is_mutable = 0;
   beet_ast_expr_init(&stmt->expr);
   beet_ast_expr_init(&stmt->condition);
   stmt->then_body = NULL;

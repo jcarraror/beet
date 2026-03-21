@@ -114,6 +114,65 @@ static void test_resolve_return_param_name(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_resolve_assignment_target_local(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    mutable total = 1\n"
+                     "    total = total + 2\n"
+                     "    return total\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+
+  assert(function_ast.body[1].kind == BEET_AST_STMT_ASSIGNMENT);
+  assert(function_ast.body[1].assignment.is_resolved == 1);
+  assert(function_ast.body[1].assignment.resolved_depth == 0U);
+  assert(function_ast.body[1].assignment.resolved_is_mutable == 1);
+  assert(function_ast.body[1].expr.left != NULL);
+  assert(function_ast.body[1].expr.left->is_resolved == 1);
+  assert(function_ast.body[1].expr.left->resolved_is_mutable == 1);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_resolve_assignment_in_else_branch(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    mutable total = 1\n"
+                     "    if false {\n"
+                     "        return 0\n"
+                     "    } else {\n"
+                     "        total = total + 2\n"
+                     "    }\n"
+                     "    return total\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+
+  assert(function_ast.body[1].kind == BEET_AST_STMT_IF);
+  assert(function_ast.body[1].else_body_count == 1U);
+  assert(function_ast.body[1].else_body != NULL);
+  assert(function_ast.body[1].else_body[0].kind == BEET_AST_STMT_ASSIGNMENT);
+  assert(function_ast.body[1].else_body[0].assignment.is_resolved == 1);
+  assert(function_ast.body[1].else_body[0].assignment.resolved_is_mutable == 1);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_resolve_if_condition_bool_literal(void) {
   const char *text = "function main() returns Int {\n"
                      "    if true {\n"
@@ -155,6 +214,25 @@ static void test_reject_missing_return_name(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_reject_missing_assignment_target(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    missing = 1\n"
+                     "    return 0\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(!beet_resolve_function(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_bind_and_lookup();
   test_reject_duplicate_in_same_scope();
@@ -162,7 +240,10 @@ int main(void) {
   test_lookup_missing();
   test_resolve_return_local_name();
   test_resolve_return_param_name();
+  test_resolve_assignment_target_local();
+  test_resolve_assignment_in_else_branch();
   test_resolve_if_condition_bool_literal();
   test_reject_missing_return_name();
+  test_reject_missing_assignment_target();
   return 0;
 }

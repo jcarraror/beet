@@ -96,6 +96,25 @@ const beet_symbol *beet_scope_lookup_slice(const beet_scope_stack *stack,
   return NULL;
 }
 
+static int beet_resolve_assignment(beet_scope_stack *stack,
+                                   beet_ast_assignment *assignment) {
+  const beet_symbol *symbol;
+
+  assert(stack != NULL);
+  assert(assignment != NULL);
+
+  symbol =
+      beet_scope_lookup_slice(stack, assignment->name, assignment->name_len);
+  if (symbol == NULL) {
+    return 0;
+  }
+
+  assignment->is_resolved = 1;
+  assignment->resolved_depth = symbol->depth;
+  assignment->resolved_is_mutable = symbol->is_mutable;
+  return 1;
+}
+
 static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr) {
   const beet_symbol *symbol;
 
@@ -155,6 +174,15 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
       }
       break;
 
+    case BEET_AST_STMT_ASSIGNMENT:
+      if (!beet_resolve_assignment(stack, &stmt->assignment)) {
+        return 0;
+      }
+      if (!beet_resolve_expr(stack, &stmt->expr)) {
+        return 0;
+      }
+      break;
+
     case BEET_AST_STMT_RETURN:
       if (!beet_resolve_expr(stack, &stmt->expr)) {
         return 0;
@@ -175,6 +203,19 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
       }
       if (!beet_scope_leave(stack)) {
         return 0;
+      }
+      if (stmt->else_body_count > 0U) {
+        if (!beet_scope_enter(stack)) {
+          return 0;
+        }
+        if (!beet_resolve_stmt_list(stack, stmt->else_body,
+                                    stmt->else_body_count)) {
+          (void)beet_scope_leave(stack);
+          return 0;
+        }
+        if (!beet_scope_leave(stack)) {
+          return 0;
+        }
       }
       break;
 
