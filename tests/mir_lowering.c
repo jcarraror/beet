@@ -474,6 +474,76 @@ static void test_lower_if_else_statement_with_bool_param(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_lower_assignment_inside_if_statement(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    mutable total = 1\n"
+                     "    if true {\n"
+                     "        total = total + 2\n"
+                     "    }\n"
+                     "    return total\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+
+  assert(strcmp(mir_function.name, "main") == 0);
+  assert(mir_function.instr_count == 10U);
+  assert(mir_function.local_count == 1U);
+  assert(strcmp(mir_function.locals[0], "total") == 0);
+
+  assert(mir_function.instrs[0].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[0].dst == 0);
+  assert(mir_function.instrs[0].int_value == 1);
+
+  assert(mir_function.instrs[1].op == BEET_MIR_OP_BIND_LOCAL);
+  assert(mir_function.instrs[1].dst == 0);
+  assert(strcmp(mir_function.instrs[1].name, "total") == 0);
+
+  assert(mir_function.instrs[2].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[2].dst == 1);
+  assert(mir_function.instrs[2].int_value == 1);
+
+  assert(mir_function.instrs[3].op == BEET_MIR_OP_JUMP_IF_FALSE);
+  assert(mir_function.instrs[3].dst == 1);
+  assert(mir_function.instrs[3].int_value == 0);
+
+  assert(mir_function.instrs[4].op == BEET_MIR_OP_LOAD_LOCAL);
+  assert(mir_function.instrs[4].dst == 2);
+  assert(strcmp(mir_function.instrs[4].name, "total") == 0);
+
+  assert(mir_function.instrs[5].op == BEET_MIR_OP_CONST_INT);
+  assert(mir_function.instrs[5].dst == 3);
+  assert(mir_function.instrs[5].int_value == 2);
+
+  assert(mir_function.instrs[6].op == BEET_MIR_OP_ADD_INT);
+  assert(mir_function.instrs[6].dst == 4);
+  assert(mir_function.instrs[6].src_lhs == 2);
+  assert(mir_function.instrs[6].src_rhs == 3);
+
+  assert(mir_function.instrs[7].op == BEET_MIR_OP_STORE_LOCAL);
+  assert(mir_function.instrs[7].dst == 4);
+  assert(strcmp(mir_function.instrs[7].name, "total") == 0);
+
+  assert(mir_function.instrs[8].op == BEET_MIR_OP_LABEL);
+  assert(mir_function.instrs[8].int_value == 0);
+
+  assert(mir_function.instrs[9].op == BEET_MIR_OP_RETURN_LOCAL);
+  assert(strcmp(mir_function.instrs[9].name, "total") == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_lower_binding_to_mir();
   test_lower_mutable_binding_to_mir();
@@ -487,5 +557,6 @@ int main(void) {
   test_lower_if_statement_with_bool_literal();
   test_lower_if_statement_with_bool_param();
   test_lower_if_else_statement_with_bool_param();
+  test_lower_assignment_inside_if_statement();
   return 0;
 }

@@ -232,8 +232,7 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
       const beet_local_type *target;
       beet_type expr_type;
 
-      target = beet_find_local_type(locals, *local_count,
-                                    stmt->assignment.name,
+      target = beet_find_local_type(locals, *local_count, stmt->assignment.name,
                                     stmt->assignment.name_len);
       if (target == NULL || !target->is_mutable) {
         return 0;

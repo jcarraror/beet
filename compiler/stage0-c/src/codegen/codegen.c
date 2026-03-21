@@ -66,6 +66,19 @@ int beet_codegen_function(const beet_mir_function *mir_function,
       break;
     }
 
+    case BEET_MIR_OP_STORE_LOCAL: {
+      int local_index = beet_find_local_index(mir_function, instr->name);
+      if (local_index < 0) {
+        return 0;
+      }
+
+      if (!beet_bytecode_emit_store_local(bytecode_function, local_index,
+                                          instr->dst)) {
+        return 0;
+      }
+      break;
+    }
+
     case BEET_MIR_OP_ADD_INT:
       if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_ADD_INT,
                                          instr->dst, instr->src_lhs,

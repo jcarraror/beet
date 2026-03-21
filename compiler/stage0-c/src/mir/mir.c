@@ -137,6 +137,29 @@ int beet_mir_add_load_local(beet_mir_function *function, const char *name,
   return temp;
 }
 
+int beet_mir_add_store_local(beet_mir_function *function, const char *name,
+                             size_t name_len, int src_temp) {
+  beet_mir_instr *instr;
+
+  assert(function != NULL);
+  assert(name != NULL);
+
+  if (function->instr_count >= BEET_MIR_MAX_INSTRS) {
+    return 0;
+  }
+
+  instr = &function->instrs[function->instr_count];
+  instr->op = BEET_MIR_OP_STORE_LOCAL;
+  instr->dst = src_temp;
+  instr->src_lhs = -1;
+  instr->src_rhs = -1;
+  instr->int_value = 0;
+  beet_copy_name(instr->name, name, name_len);
+
+  function->instr_count += 1U;
+  return 1;
+}
+
 int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
                             int lhs_temp, int rhs_temp) {
   beet_mir_instr *instr;
@@ -628,6 +651,20 @@ static int beet_mir_lower_stmt_list(beet_mir_function *function,
         return 0;
       }
       break;
+
+    case BEET_AST_STMT_ASSIGNMENT: {
+      int temp;
+
+      if (!beet_mir_lower_expr(function, &stmt->expr, &temp)) {
+        return 0;
+      }
+
+      if (!beet_mir_add_store_local(function, stmt->assignment.name,
+                                    stmt->assignment.name_len, temp)) {
+        return 0;
+      }
+      break;
+    }
 
     case BEET_AST_STMT_RETURN:
       if (!beet_mir_lower_return_stmt(function, stmt)) {

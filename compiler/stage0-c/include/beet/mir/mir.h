@@ -13,6 +13,7 @@ typedef enum beet_mir_opcode {
   BEET_MIR_OP_CONST_INT = 0,
   BEET_MIR_OP_BIND_LOCAL,
   BEET_MIR_OP_LOAD_LOCAL,
+  BEET_MIR_OP_STORE_LOCAL,
   BEET_MIR_OP_ADD_INT,
   BEET_MIR_OP_SUB_INT,
   BEET_MIR_OP_MUL_INT,
@@ -60,6 +61,8 @@ int beet_mir_add_bind_local(beet_mir_function *function, const char *name,
                             size_t name_len, int src_temp);
 int beet_mir_add_load_local(beet_mir_function *function, const char *name,
                             size_t name_len);
+int beet_mir_add_store_local(beet_mir_function *function, const char *name,
+                             size_t name_len, int src_temp);
 int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
                             int lhs_temp, int rhs_temp);
 int beet_mir_next_label(beet_mir_function *function);
