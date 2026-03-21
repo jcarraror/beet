@@ -26,6 +26,25 @@ static void test_infer_int_binding(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_infer_bool_binding(void) {
+  const char *text = "bind flag = true\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_binding binding;
+  beet_type type;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_binding(&parser, &binding));
+  type = beet_type_check_binding(&binding);
+
+  assert(type.kind == BEET_TYPE_BOOL);
+  assert(strcmp(type.name, "Bool") == 0);
+
+  beet_source_file_dispose(&file);
+}
 static void test_typed_binding_ok(void) {
   const char *text = "bind x is Int = 5\n";
   beet_source_file file;
@@ -167,6 +186,26 @@ static void test_function_body_arithmetic_rejects_non_int(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_body_bool_return_ok(void) {
+  const char *text = "function main() returns Bool {\n"
+                     "    return true\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_if_condition_bool_ok(void) {
   const char *text = "function choose(flag is Bool) returns Int {\n"
                      "    if flag {\n"
@@ -262,6 +301,7 @@ static void test_if_body_binding_does_not_escape_scope(void) {
 
 int main(void) {
   test_infer_int_binding();
+  test_infer_bool_binding();
   test_typed_binding_ok();
   test_typed_binding_mismatch();
   test_function_signature_types();
@@ -269,6 +309,7 @@ int main(void) {
   test_function_body_arithmetic_ok();
   test_function_body_unary_grouped_int_ok();
   test_function_body_arithmetic_rejects_non_int();
+  test_function_body_bool_return_ok();
   test_if_condition_bool_ok();
   test_if_condition_rejects_non_bool();
   test_while_condition_bool_ok();

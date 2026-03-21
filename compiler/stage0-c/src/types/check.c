@@ -23,6 +23,18 @@ static beet_type beet_type_from_value_text(const char *text, size_t len) {
   type.kind = BEET_TYPE_INVALID;
   type.name = NULL;
 
+  if (len == 4U && strncmp(text, "true", 4U) == 0) {
+    type.kind = BEET_TYPE_BOOL;
+    type.name = "Bool";
+    return type;
+  }
+
+  if (len == 5U && strncmp(text, "false", 5U) == 0) {
+    type.kind = BEET_TYPE_BOOL;
+    type.name = "Bool";
+    return type;
+  }
+
   if (len == 2U && strncmp(text, "()", 2U) == 0) {
     type.kind = BEET_TYPE_UNIT;
     type.name = "Unit";
