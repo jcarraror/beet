@@ -147,6 +147,8 @@ static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
   beet_ast_expr_init(&stmt->condition);
   stmt->then_body = NULL;
   stmt->then_body_count = 0U;
+  stmt->else_body = NULL;
+  stmt->else_body_count = 0U;
   stmt->loop_body = NULL;
   stmt->loop_body_count = 0U;
 }
@@ -501,6 +503,7 @@ static int beet_parser_parse_if_stmt(beet_parser *parser,
                                      beet_ast_function *function,
                                      beet_ast_stmt *out) {
   size_t body_start;
+  size_t else_start;
 
   assert(parser != NULL);
   assert(function != NULL);
@@ -541,6 +544,38 @@ static int beet_parser_parse_if_stmt(beet_parser *parser,
 
   if (out->then_body_count > 0U) {
     out->then_body = &function->stmt_nodes[body_start];
+  }
+
+  if (!beet_parser_match(parser, BEET_TOKEN_KW_ELSE)) {
+    return 1;
+  }
+
+  if (!beet_expect(parser, BEET_TOKEN_LBRACE)) {
+    return 0;
+  }
+
+  else_start = function->stmt_node_count;
+  while (parser->current.kind != BEET_TOKEN_RBRACE) {
+    beet_ast_stmt *nested_stmt;
+
+    nested_stmt = beet_ast_stmt_alloc(function);
+    if (nested_stmt == NULL) {
+      return 0;
+    }
+
+    if (!beet_parser_parse_stmt(parser, function, nested_stmt)) {
+      return 0;
+    }
+
+    out->else_body_count += 1U;
+  }
+
+  if (!beet_expect(parser, BEET_TOKEN_RBRACE)) {
+    return 0;
+  }
+
+  if (out->else_body_count > 0U) {
+    out->else_body = &function->stmt_nodes[else_start];
   }
 
   return 1;

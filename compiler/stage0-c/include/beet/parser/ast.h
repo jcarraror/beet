@@ -78,6 +78,8 @@ typedef struct beet_ast_stmt {
   beet_ast_expr condition;
   struct beet_ast_stmt *then_body;
   size_t then_body_count;
+  struct beet_ast_stmt *else_body;
+  size_t else_body_count;
   struct beet_ast_stmt *loop_body;
   size_t loop_body_count;
 } beet_ast_stmt;

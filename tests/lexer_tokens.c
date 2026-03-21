@@ -131,6 +131,8 @@ static void test_control_flow_keyword_tokens(void) {
                             "    while true {\n"
                             "        if false {\n"
                             "            return 1\n"
+                            "        } else {\n"
+                            "            return 2\n"
                             "        }\n"
                             "    }\n"
                             "    return 0\n"
@@ -152,6 +154,11 @@ static void test_control_flow_keyword_tokens(void) {
       {BEET_TOKEN_LBRACE, "{"},
       {BEET_TOKEN_KW_RETURN, "return"},
       {BEET_TOKEN_INT_LITERAL, "1"},
+      {BEET_TOKEN_RBRACE, "}"},
+      {BEET_TOKEN_KW_ELSE, "else"},
+      {BEET_TOKEN_LBRACE, "{"},
+      {BEET_TOKEN_KW_RETURN, "return"},
+      {BEET_TOKEN_INT_LITERAL, "2"},
       {BEET_TOKEN_RBRACE, "}"},
       {BEET_TOKEN_RBRACE, "}"},
       {BEET_TOKEN_KW_RETURN, "return"},

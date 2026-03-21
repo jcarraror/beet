@@ -103,6 +103,9 @@ static beet_token_kind beet_identifier_kind(const char *text, size_t len) {
   if (len == 2U && strncmp(text, "if", 2U) == 0) {
     return BEET_TOKEN_KW_IF;
   }
+  if (len == 4U && strncmp(text, "else", 4U) == 0) {
+    return BEET_TOKEN_KW_ELSE;
+  }
   if (len == 5U && strncmp(text, "while", 5U) == 0) {
     return BEET_TOKEN_KW_WHILE;
   }
@@ -169,6 +172,8 @@ const char *beet_token_kind_name(beet_token_kind kind) {
     return "kw_case";
   case BEET_TOKEN_KW_IF:
     return "kw_if";
+  case BEET_TOKEN_KW_ELSE:
+    return "kw_else";
   case BEET_TOKEN_KW_WHILE:
     return "kw_while";
   case BEET_TOKEN_KW_BORROWED:

@@ -49,6 +49,8 @@ type Option(Value) = choice {
 
 if condition {
     ...
+} else {
+    ...
 }
 
 while condition {

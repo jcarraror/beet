@@ -281,6 +281,40 @@ static void test_while_statement_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_if_else_statement_function(void) {
+  const char *text = "function choose(flag is Bool) returns Int {\n"
+                     "    if flag {\n"
+                     "        return 1\n"
+                     "    } else {\n"
+                     "        return 2\n"
+                     "    }\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_IF);
+  assert(function_ast.body[0].condition.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[0].then_body_count == 1U);
+  assert(function_ast.body[0].then_body != NULL);
+  assert(function_ast.body[0].then_body[0].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].else_body_count == 1U);
+  assert(function_ast.body[0].else_body != NULL);
+  assert(function_ast.body[0].else_body[0].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].else_body[0].expr.kind ==
+         BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[0].else_body[0].expr.text, "2", 1) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_if_statement_function(void) {
   const char *text = "function choose(x is Int, y is Int) returns Int {\n"
                      "    if x {\n"
@@ -346,6 +380,7 @@ int main(void) {
   test_unary_and_grouped_expression_function();
   test_comparison_expression_function();
   test_while_statement_function();
+  test_if_else_statement_function();
   test_if_statement_function();
   return 0;
 }
