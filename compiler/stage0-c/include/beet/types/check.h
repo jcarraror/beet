@@ -17,6 +17,10 @@ int beet_type_check_function_signature_with_type_decls(
     const beet_ast_function *function_ast, const beet_ast_type_decl *type_decls,
     size_t decl_count);
 int beet_type_check_function_signature(const beet_ast_function *function_ast);
+int beet_type_check_function_body_with_decls(
+    const beet_ast_function *function_ast, const beet_ast_type_decl *type_decls,
+    size_t decl_count, const beet_ast_function *function_decls,
+    size_t function_count);
 int beet_type_check_function_body_with_type_decls(
     const beet_ast_function *function_ast, const beet_ast_type_decl *type_decls,
     size_t decl_count);

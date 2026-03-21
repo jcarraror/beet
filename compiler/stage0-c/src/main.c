@@ -97,8 +97,8 @@ static int beet_compile_and_run_file(const char *path, int *out_result) {
     return 0;
   }
 
-  if (!beet_type_check_function_body_with_type_decls(
-          &function_ast, type_decls, type_decl_count)) {
+  if (!beet_type_check_function_body_with_type_decls(&function_ast, type_decls,
+                                                     type_decl_count)) {
     fprintf(stderr, "error: invalid function body types in '%s'\n", path);
     beet_source_file_dispose(&file);
     return 0;

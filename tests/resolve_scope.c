@@ -281,6 +281,56 @@ static void test_resolve_binding_expression_uses_prior_local(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_resolve_function_call_against_decl_set(void) {
+  const char *text = "function add(x is Int, y is Int) returns Int {\n"
+                     "    return x + y\n"
+                     "}\n"
+                     "function main() returns Int {\n"
+                     "    bind value = 2\n"
+                     "    return add(value, 3)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function functions[2];
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &functions[0]));
+  assert(beet_parser_parse_function(&parser, &functions[1]));
+  assert(beet_resolve_function_with_decls(&functions[1], functions, 2U));
+
+  assert(functions[1].body[1].expr.kind == BEET_AST_EXPR_CALL);
+  assert(functions[1].body[1].expr.call_is_resolved == 1);
+  assert(functions[1].body[1].expr.call_target_index == 0U);
+  assert(functions[1].body[1].expr.arg_count == 2U);
+  assert(functions[1].body[1].expr.args[0] != NULL);
+  assert(functions[1].body[1].expr.args[0]->kind == BEET_AST_EXPR_NAME);
+  assert(functions[1].body[1].expr.args[0]->is_resolved == 1);
+  assert(functions[1].body[1].expr.args[0]->resolved_depth == 0U);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_reject_missing_called_function(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    return missing(1)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(!beet_resolve_function_with_decls(&function_ast, &function_ast, 1U));
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_reject_missing_return_name(void) {
   const char *text = "function main() returns Int {\n"
                      "    return missing\n"
@@ -331,7 +381,9 @@ int main(void) {
   test_resolve_names_inside_structure_construction();
   test_resolve_binding_expression_uses_prior_local();
   test_resolve_if_condition_bool_literal();
+  test_resolve_function_call_against_decl_set();
   test_reject_missing_return_name();
+  test_reject_missing_called_function();
   test_reject_missing_assignment_target();
   return 0;
 }

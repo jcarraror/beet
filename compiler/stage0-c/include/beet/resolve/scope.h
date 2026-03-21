@@ -37,6 +37,9 @@ const beet_symbol *beet_scope_lookup(const beet_scope_stack *stack,
 const beet_symbol *beet_scope_lookup_slice(const beet_scope_stack *stack,
                                            const char *name, size_t name_len);
 
+int beet_resolve_function_with_decls(beet_ast_function *function_ast,
+                                     const beet_ast_function *function_decls,
+                                     size_t function_count);
 int beet_resolve_function(beet_ast_function *function_ast);
 
 #endif

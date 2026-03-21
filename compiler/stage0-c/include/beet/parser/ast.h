@@ -15,6 +15,7 @@ typedef enum beet_ast_expr_kind {
   BEET_AST_EXPR_INT_LITERAL,
   BEET_AST_EXPR_BOOL_LITERAL,
   BEET_AST_EXPR_NAME,
+  BEET_AST_EXPR_CALL,
   BEET_AST_EXPR_CONSTRUCT,
   BEET_AST_EXPR_FIELD,
   BEET_AST_EXPR_UNARY,
@@ -52,11 +53,16 @@ typedef struct beet_ast_expr {
   int is_resolved;
   size_t resolved_depth;
   int resolved_is_mutable;
+  int call_is_resolved;
+  size_t call_target_index;
 
   beet_ast_unary_op unary_op;
   beet_ast_binary_op binary_op;
   struct beet_ast_expr *left;
   struct beet_ast_expr *right;
+
+  struct beet_ast_expr *args[BEET_AST_MAX_PARAMS];
+  size_t arg_count;
 
   beet_ast_field_init field_inits[BEET_AST_MAX_FIELDS];
   size_t field_init_count;

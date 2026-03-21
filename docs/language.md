@@ -67,6 +67,8 @@ match value {
 
 ## Expressions
 
+name(value, ...)
+
 Type(field = value, ...)
 
 Point(x = 3, y = 4)

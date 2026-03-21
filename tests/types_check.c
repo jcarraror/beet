@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "beet/parser/parser.h"
+#include "beet/resolve/scope.h"
 #include "beet/support/source.h"
 #include "beet/types/check.h"
 #include "beet/types/types.h"
@@ -753,6 +754,58 @@ static void test_function_body_structure_binding_and_field_access_ok(void) {
   beet_source_file_dispose(&decl_file);
 }
 
+static void test_function_call_body_ok(void) {
+  const char *text = "function add(x is Int, y is Int) returns Int {\n"
+                     "    return x + y\n"
+                     "}\n"
+                     "function main() returns Int {\n"
+                     "    return add(1, 2)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function functions[2];
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &functions[0]));
+  assert(beet_parser_parse_function(&parser, &functions[1]));
+  assert(beet_type_check_function_signature(&functions[0]));
+  assert(beet_type_check_function_signature(&functions[1]));
+  assert(beet_resolve_function_with_decls(&functions[1], functions, 2U));
+  assert(beet_type_check_function_body_with_decls(&functions[1], NULL, 0U,
+                                                  functions, 2U));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_function_call_rejects_argument_type_mismatch(void) {
+  const char *text = "function add(x is Int, y is Int) returns Int {\n"
+                     "    return x + y\n"
+                     "}\n"
+                     "function main() returns Int {\n"
+                     "    return add(true, 2)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function functions[2];
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &functions[0]));
+  assert(beet_parser_parse_function(&parser, &functions[1]));
+  assert(beet_type_check_function_signature(&functions[0]));
+  assert(beet_type_check_function_signature(&functions[1]));
+  assert(beet_resolve_function_with_decls(&functions[1], functions, 2U));
+  assert(!beet_type_check_function_body_with_decls(&functions[1], NULL, 0U,
+                                                   functions, 2U));
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_if_condition_rejects_non_bool(void) {
   const char *text = "function choose(x is Int) returns Int {\n"
                      "    if x {\n"
@@ -855,6 +908,8 @@ int main(void) {
   test_function_body_structure_construction_rejects_field_type_mismatch();
   test_function_body_field_access_rejects_unknown_field();
   test_function_body_structure_binding_and_field_access_ok();
+  test_function_call_body_ok();
+  test_function_call_rejects_argument_type_mismatch();
   test_if_condition_bool_ok();
   test_if_condition_rejects_non_bool();
   test_while_condition_bool_ok();

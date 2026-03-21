@@ -473,6 +473,36 @@ static void test_if_statement_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_call_expression_function(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    return add(1, 2 * 3)\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].expr.kind == BEET_AST_EXPR_CALL);
+  assert(function_ast.body[0].expr.text_len == 3U);
+  assert(strncmp(function_ast.body[0].expr.text, "add", 3) == 0);
+  assert(function_ast.body[0].expr.arg_count == 2U);
+  assert(function_ast.body[0].expr.args[0] != NULL);
+  assert(function_ast.body[0].expr.args[0]->kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[0].expr.args[0]->text, "1", 1) == 0);
+  assert(function_ast.body[0].expr.args[1] != NULL);
+  assert(function_ast.body[0].expr.args[1]->kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[0].expr.args[1]->binary_op == BEET_AST_BINARY_MUL);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_structure_construction_and_field_access_function(void) {
   const char *text = "function main() returns Int {\n"
                      "    return Point(x = 3, y = 4).x\n"
@@ -532,6 +562,7 @@ int main(void) {
   test_while_statement_function();
   test_if_else_statement_function();
   test_if_statement_function();
+  test_function_call_expression_function();
   test_structure_construction_and_field_access_function();
   return 0;
 }
