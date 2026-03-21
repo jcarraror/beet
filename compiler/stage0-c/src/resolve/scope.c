@@ -190,10 +190,8 @@ static int beet_resolve_expr(beet_scope_stack *stack, beet_ast_expr *expr,
     size_t i;
 
     for (i = 0U; i < expr->field_init_count; ++i) {
-      if (expr->field_inits[i].value == NULL) {
-        return 0;
-      }
-      if (!beet_resolve_expr(stack, expr->field_inits[i].value, function_decls,
+      if (expr->field_inits[i].value != NULL &&
+          !beet_resolve_expr(stack, expr->field_inits[i].value, function_decls,
                              function_count)) {
         return 0;
       }

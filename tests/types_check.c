@@ -876,6 +876,152 @@ static void test_if_body_binding_does_not_escape_scope(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_function_body_choice_construction_with_payload_ok(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text = "function main() returns MaybeInt {\n"
+                              "    return MaybeInt.some(1)\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void test_function_body_choice_construction_without_payload_ok(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text = "function main() returns MaybeInt {\n"
+                              "    return MaybeInt.none()\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void
+test_function_body_choice_construction_rejects_payload_type_mismatch(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text = "function main() returns MaybeInt {\n"
+                              "    return MaybeInt.some(true)\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(!beet_type_check_function_body_with_type_decls(&function_ast,
+                                                        &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
+static void
+test_function_body_choice_construction_rejects_payload_on_empty_variant(void) {
+  const char *decl_text = "type MaybeInt = choice {\n"
+                          "    none\n"
+                          "    some(Int)\n"
+                          "}\n";
+  const char *function_text = "function main() returns MaybeInt {\n"
+                              "    return MaybeInt.none(1)\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "option.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(!beet_type_check_function_body_with_type_decls(&function_ast,
+                                                        &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 int main(void) {
   test_infer_int_binding();
   test_infer_bool_binding();
@@ -908,6 +1054,10 @@ int main(void) {
   test_function_body_structure_construction_rejects_field_type_mismatch();
   test_function_body_field_access_rejects_unknown_field();
   test_function_body_structure_binding_and_field_access_ok();
+  test_function_body_choice_construction_with_payload_ok();
+  test_function_body_choice_construction_without_payload_ok();
+  test_function_body_choice_construction_rejects_payload_type_mismatch();
+  test_function_body_choice_construction_rejects_payload_on_empty_variant();
   test_function_call_body_ok();
   test_function_call_rejects_argument_type_mismatch();
   test_if_condition_bool_ok();

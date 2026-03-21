@@ -71,15 +71,20 @@ name(value, ...)
 
 Type(field = value, ...)
 
+Type.variant()
+Type.variant(value)
+
 Point(x = 3, y = 4)
+Option.some(1)
+Option.none()
 
 ---
 
 ## Generics
 
 Option(Int)
-Result(Value, Error)
-Map(Key, Value)
+Outcome(Value, Error)
+Lookup(Key, Value)
 
 ---
 

@@ -148,6 +148,25 @@ beet_find_structure_field(const beet_ast_type_decl *type_decl, const char *name,
   return NULL;
 }
 
+static const beet_ast_choice_variant *
+beet_find_choice_variant(const beet_ast_type_decl *type_decl, const char *name,
+                         size_t name_len) {
+  size_t i;
+
+  assert(type_decl != NULL);
+  assert(name != NULL);
+
+  for (i = 0U; i < type_decl->variant_count; ++i) {
+    if (beet_name_equals_slice(type_decl->variants[i].name,
+                               type_decl->variants[i].name_len, name,
+                               name_len)) {
+      return &type_decl->variants[i];
+    }
+  }
+
+  return NULL;
+}
+
 static beet_type
 beet_type_check_expr(const beet_ast_expr *expr, const beet_local_type *locals,
                      size_t local_count, const beet_ast_type_decl *type_decls,
@@ -228,49 +247,97 @@ beet_type_check_expr(const beet_ast_expr *expr, const beet_local_type *locals,
 
     type_decl =
         beet_find_type_decl(type_decls, decl_count, expr->text, expr->text_len);
-    if (type_decl == NULL || !type_decl->is_structure) {
+    if (type_decl == NULL) {
       return type;
     }
 
-    if (expr->field_init_count != type_decl->field_count) {
-      return type;
-    }
+    if (type_decl->is_structure) {
+      if (expr->field_init_count != type_decl->field_count) {
+        return type;
+      }
 
-    for (i = 0U; i < expr->field_init_count; ++i) {
-      const beet_ast_field *field_decl;
-      beet_type field_type;
-      beet_type value_type;
+      for (i = 0U; i < expr->field_init_count; ++i) {
+        const beet_ast_field *field_decl;
+        beet_type field_type;
+        beet_type value_type;
 
-      for (j = i + 1U; j < expr->field_init_count; ++j) {
-        if (beet_name_equals_slice(
-                expr->field_inits[i].name, expr->field_inits[i].name_len,
-                expr->field_inits[j].name, expr->field_inits[j].name_len)) {
+        for (j = i + 1U; j < expr->field_init_count; ++j) {
+          if (beet_name_equals_slice(
+                  expr->field_inits[i].name, expr->field_inits[i].name_len,
+                  expr->field_inits[j].name, expr->field_inits[j].name_len)) {
+            return type;
+          }
+        }
+
+        field_decl =
+            beet_find_structure_field(type_decl, expr->field_inits[i].name,
+                                      expr->field_inits[i].name_len);
+        if (field_decl == NULL || expr->field_inits[i].value == NULL) {
+          return type;
+        }
+
+        field_type = beet_type_from_name_slice_in_context(
+            field_decl->type_name, field_decl->type_name_len, type_decls,
+            decl_count);
+        value_type = beet_type_check_expr(expr->field_inits[i].value, locals,
+                                          local_count, type_decls, decl_count,
+                                          function_decls, function_count);
+        if (!beet_type_is_valid(&field_type) ||
+            !beet_type_is_valid(&value_type) ||
+            !beet_type_equals(&field_type, &value_type)) {
           return type;
         }
       }
 
-      field_decl = beet_find_structure_field(
-          type_decl, expr->field_inits[i].name, expr->field_inits[i].name_len);
-      if (field_decl == NULL || expr->field_inits[i].value == NULL) {
-        return type;
-      }
-
-      field_type = beet_type_from_name_slice_in_context(
-          field_decl->type_name, field_decl->type_name_len, type_decls,
-          decl_count);
-      value_type = beet_type_check_expr(expr->field_inits[i].value, locals,
-                                        local_count, type_decls, decl_count,
-                                        function_decls, function_count);
-      if (!beet_type_is_valid(&field_type) ||
-          !beet_type_is_valid(&value_type) ||
-          !beet_type_equals(&field_type, &value_type)) {
-        return type;
-      }
+      type.kind = BEET_TYPE_NAMED;
+      type.name = type_decl->name;
+      type.name_len = type_decl->name_len;
+      return type;
     }
 
-    type.kind = BEET_TYPE_NAMED;
-    type.name = type_decl->name;
-    type.name_len = type_decl->name_len;
+    if (type_decl->is_choice) {
+      const beet_ast_choice_variant *variant_decl;
+      beet_type payload_type;
+      beet_type value_type;
+
+      if (expr->field_init_count != 1U) {
+        return type;
+      }
+
+      variant_decl = beet_find_choice_variant(
+          type_decl, expr->field_inits[0].name, expr->field_inits[0].name_len);
+      if (variant_decl == NULL) {
+        return type;
+      }
+
+      if (!variant_decl->has_payload) {
+        if (expr->field_inits[0].value != NULL) {
+          return type;
+        }
+      } else {
+        if (expr->field_inits[0].value == NULL) {
+          return type;
+        }
+
+        payload_type = beet_type_from_name_slice_in_context(
+            variant_decl->payload_type_name,
+            variant_decl->payload_type_name_len, type_decls, decl_count);
+        value_type = beet_type_check_expr(expr->field_inits[0].value, locals,
+                                          local_count, type_decls, decl_count,
+                                          function_decls, function_count);
+        if (!beet_type_is_valid(&payload_type) ||
+            !beet_type_is_valid(&value_type) ||
+            !beet_type_equals(&payload_type, &value_type)) {
+          return type;
+        }
+      }
+
+      type.kind = BEET_TYPE_NAMED;
+      type.name = type_decl->name;
+      type.name_len = type_decl->name_len;
+      return type;
+    }
+
     return type;
   }
 

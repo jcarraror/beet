@@ -548,6 +548,38 @@ static void test_structure_construction_and_field_access_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_choice_construction_function(void) {
+  const char *text = "function main() returns Option {\n"
+                     "    return Option.some(1)\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 1U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_RETURN);
+  assert(function_ast.body[0].expr.kind == BEET_AST_EXPR_CONSTRUCT);
+  assert(function_ast.body[0].expr.text_len == 6U);
+  assert(strncmp(function_ast.body[0].expr.text, "Option", 6) == 0);
+  assert(function_ast.body[0].expr.field_init_count == 1U);
+  assert(function_ast.body[0].expr.field_inits[0].name_len == 4U);
+  assert(strncmp(function_ast.body[0].expr.field_inits[0].name, "some", 4) ==
+         0);
+  assert(function_ast.body[0].expr.field_inits[0].value != NULL);
+  assert(function_ast.body[0].expr.field_inits[0].value->kind ==
+         BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[0].expr.field_inits[0].value->text, "1",
+                 1) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_empty_function();
   test_function_with_params();
@@ -564,5 +596,6 @@ int main(void) {
   test_if_statement_function();
   test_function_call_expression_function();
   test_structure_construction_and_field_access_function();
+  test_choice_construction_function();
   return 0;
 }
