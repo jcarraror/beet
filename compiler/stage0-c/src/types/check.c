@@ -9,6 +9,7 @@ typedef struct beet_local_type {
   const char *name;
   size_t name_len;
   beet_type type;
+  int is_mutable;
 } beet_local_type;
 
 #define BEET_TYPE_CHECK_MAX_LOCALS 128
@@ -222,7 +223,26 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
       locals[*local_count].name = stmt->binding.name;
       locals[*local_count].name_len = stmt->binding.name_len;
       locals[*local_count].type = binding_type;
+      locals[*local_count].is_mutable = stmt->binding.is_mutable;
       *local_count += 1U;
+      break;
+    }
+
+    case BEET_AST_STMT_ASSIGNMENT: {
+      const beet_local_type *target;
+      beet_type expr_type;
+
+      target = beet_find_local_type(locals, *local_count,
+                                    stmt->assignment.name,
+                                    stmt->assignment.name_len);
+      if (target == NULL || !target->is_mutable) {
+        return 0;
+      }
+
+      expr_type = beet_type_check_expr(&stmt->expr, locals, *local_count);
+      if (expr_type.kind != target->type.kind) {
+        return 0;
+      }
       break;
     }
 
@@ -376,6 +396,7 @@ int beet_type_check_function_body(const beet_ast_function *function_ast) {
     locals[local_count].name = function_ast->params[i].name;
     locals[local_count].name_len = function_ast->params[i].name_len;
     locals[local_count].type = param_type;
+    locals[local_count].is_mutable = 0;
     local_count += 1U;
   }
 

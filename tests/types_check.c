@@ -295,6 +295,71 @@ static void test_else_body_binding_does_not_escape_scope(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_mutable_assignment_ok(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    mutable total = 1\n"
+                     "    total = total + 2\n"
+                     "    return total\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_assignment_rejects_immutable_target(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind total = 1\n"
+                     "    total = 2\n"
+                     "    return total\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(!beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_assignment_rejects_type_mismatch(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    mutable total = 1\n"
+                     "    total = true\n"
+                     "    return total\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(!beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
 static void test_if_condition_bool_ok(void) {
   const char *text = "function choose(flag is Bool) returns Int {\n"
                      "    if flag {\n"
@@ -403,6 +468,9 @@ int main(void) {
   test_function_body_comparison_rejects_non_int();
   test_if_else_branches_ok();
   test_else_body_binding_does_not_escape_scope();
+  test_mutable_assignment_ok();
+  test_assignment_rejects_immutable_target();
+  test_assignment_rejects_type_mismatch();
   test_if_condition_bool_ok();
   test_if_condition_rejects_non_bool();
   test_while_condition_bool_ok();
