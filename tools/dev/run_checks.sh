@@ -18,6 +18,20 @@ have_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
+should_valgrind_test_exe() {
+    case "$1" in
+        test_diag_print|test_smoke_compiler|test_smoke_vm)
+            return 1
+            ;;
+        test_*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 format_tracked_files() {
     if ! have_cmd clang-format; then
         say "[beet] clang-format not found; skipping formatting"
@@ -55,6 +69,49 @@ configure_build_test() {
     ctest --test-dir build --output-on-failure
 }
 
+run_valgrind_tests() {
+    if [ "${BEET_SKIP_VALGRIND:-0}" = "1" ]; then
+        say "[beet] BEET_SKIP_VALGRIND=1; skipping valgrind"
+        return 0
+    fi
+
+    if ! have_cmd valgrind; then
+        say "[beet] valgrind not found; skipping valgrind tests"
+        return 0
+    fi
+
+    : > "$tmp_files"
+    for test_exe in build/test_*; do
+        [ -f "$test_exe" ] || continue
+        [ -x "$test_exe" ] || continue
+
+        test_name="$(basename "$test_exe")"
+        if should_valgrind_test_exe "$test_name"; then
+            printf '%s\n' "$test_exe" >> "$tmp_files"
+        fi
+    done
+
+    if [ ! -s "$tmp_files" ]; then
+        say "[beet] no valgrind-eligible unit test executables found"
+        return 0
+    fi
+
+    say "[beet] running valgrind on selected unit test executables"
+
+    while IFS= read -r test_exe; do
+        [ -n "$test_exe" ] || continue
+        say "[beet] valgrind: ${test_exe#./}"
+        valgrind \
+            --quiet \
+            --error-exitcode=1 \
+            --leak-check=full \
+            --show-leak-kinds=definite,possible \
+            --errors-for-leak-kinds=definite,possible \
+            --track-origins=yes \
+            "$test_exe"
+    done < "$tmp_files"
+}
+
 format_tracked_files
 
 if [ "${MODE}" = "--hook" ] && [ "$had_format_changes" -eq 1 ]; then
@@ -66,4 +123,5 @@ if [ "${MODE}" = "--hook" ] && [ "$had_format_changes" -eq 1 ]; then
 fi
 
 configure_build_test
+run_valgrind_tests
 say "[beet] checks passed"

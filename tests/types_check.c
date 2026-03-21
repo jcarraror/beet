@@ -87,6 +87,27 @@ static void test_typed_binding_mismatch(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_typed_binding_expression_ok(void) {
+  const char *text = "bind x is Int = 1 + 2\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_binding binding;
+  beet_type_check_result result;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_binding(&parser, &binding));
+  result = beet_type_check_binding_annotation(&binding);
+
+  assert(result.ok);
+  assert(result.declared_type.kind == BEET_TYPE_INT);
+  assert(result.value_type.kind == BEET_TYPE_INT);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_function_signature_types(void) {
   const char *text = "function add(x is Int, y is Int) returns Int {\n"
                      "    return 0\n"
@@ -274,6 +295,27 @@ static void test_function_signature_rejects_unknown_type_name(void) {
 static void test_function_body_arithmetic_ok(void) {
   const char *text = "function add(x is Int, y is Int) returns Int {\n"
                      "    return x + y * 2\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_function_body_binding_expression_uses_local_ok(void) {
+  const char *text = "function add_one(x is Int) returns Int {\n"
+                     "    bind y = x + 1\n"
+                     "    return y\n"
                      "}\n";
 
   beet_source_file file;
@@ -674,6 +716,43 @@ static void test_function_body_field_access_rejects_unknown_field(void) {
   beet_source_file_dispose(&decl_file);
 }
 
+static void test_function_body_structure_binding_and_field_access_ok(void) {
+  const char *decl_text = "type Point = structure {\n"
+                          "    x is Int\n"
+                          "    y is Int\n"
+                          "}\n";
+  const char *function_text = "function main() returns Int {\n"
+                              "    bind point is Point = Point(x = 3, y = 4)\n"
+                              "    return point.x\n"
+                              "}\n";
+  beet_source_file decl_file;
+  beet_source_file function_file;
+  beet_parser parser;
+  beet_ast_type_decl type_decl;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&decl_file);
+  beet_source_file_init(&function_file);
+  assert(beet_source_file_set_text_copy(&decl_file, "point.beet", decl_text));
+  assert(beet_source_file_set_text_copy(&function_file, "main.beet",
+                                        function_text));
+
+  beet_parser_init(&parser, &decl_file);
+  assert(beet_parser_parse_type_decl(&parser, &type_decl));
+
+  beet_parser_init(&parser, &function_file);
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decl(&type_decl));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            &type_decl, 1U));
+  assert(beet_type_check_function_body_with_type_decls(&function_ast,
+                                                       &type_decl, 1U));
+
+  beet_source_file_dispose(&function_file);
+  beet_source_file_dispose(&decl_file);
+}
+
 static void test_if_condition_rejects_non_bool(void) {
   const char *text = "function choose(x is Int) returns Int {\n"
                      "    if x {\n"
@@ -749,6 +828,7 @@ int main(void) {
   test_infer_bool_binding();
   test_typed_binding_ok();
   test_typed_binding_mismatch();
+  test_typed_binding_expression_ok();
   test_function_signature_types();
   test_type_decl_fields_known();
   test_parameterized_structure_type_decl_ok();
@@ -759,6 +839,7 @@ int main(void) {
   test_choice_type_decl_rejects_duplicate_variants();
   test_function_signature_rejects_unknown_type_name();
   test_function_body_arithmetic_ok();
+  test_function_body_binding_expression_uses_local_ok();
   test_function_body_unary_grouped_int_ok();
   test_function_body_arithmetic_rejects_non_int();
   test_function_body_bool_return_ok();
@@ -773,6 +854,7 @@ int main(void) {
   test_function_body_structure_construction_and_field_access_ok();
   test_function_body_structure_construction_rejects_field_type_mismatch();
   test_function_body_field_access_rejects_unknown_field();
+  test_function_body_structure_binding_and_field_access_ok();
   test_if_condition_bool_ok();
   test_if_condition_rejects_non_bool();
   test_while_condition_bool_ok();

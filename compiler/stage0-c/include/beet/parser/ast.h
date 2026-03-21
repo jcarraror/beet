@@ -74,6 +74,8 @@ typedef struct beet_ast_binding {
 
   const char *value_text;
   size_t value_len;
+
+  beet_ast_expr expr;
 } beet_ast_binding;
 
 typedef struct beet_ast_assignment {

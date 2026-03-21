@@ -187,6 +187,9 @@ static int beet_resolve_stmt_list(beet_scope_stack *stack, beet_ast_stmt *stmts,
 
     switch (stmt->kind) {
     case BEET_AST_STMT_BINDING:
+      if (!beet_resolve_expr(stack, &stmt->binding.expr)) {
+        return 0;
+      }
       if (!beet_scope_bind_slice(stack, stmt->binding.name,
                                  stmt->binding.name_len,
                                  stmt->binding.is_mutable)) {

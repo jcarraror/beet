@@ -23,6 +23,8 @@ static void test_simple_bind(void) {
   assert(binding.has_type == 0);
   assert(strncmp(binding.name, "x", 1) == 0);
   assert(strncmp(binding.value_text, "10", 2) == 0);
+  assert(binding.expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(binding.expr.text, "10", 2) == 0);
 
   beet_source_file_dispose(&file);
 }
@@ -44,6 +46,8 @@ static void test_mutable_bind(void) {
   assert(binding.is_mutable == 1);
   assert(binding.has_type == 0);
   assert(strncmp(binding.name, "total", 5) == 0);
+  assert(binding.expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(binding.expr.text, "0", 1) == 0);
 
   beet_source_file_dispose(&file);
 }
@@ -64,6 +68,40 @@ static void test_typed_bind(void) {
 
   assert(binding.has_type == 1);
   assert(strncmp(binding.type_name, "Int", 3) == 0);
+  assert(binding.expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(binding.expr.text, "5", 1) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_expression_bind(void) {
+  const char *text = "bind total = 1 + 2 * 3\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_binding binding;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_binding(&parser, &binding));
+
+  assert(binding.value_text == NULL);
+  assert(binding.value_len == 0U);
+  assert(binding.expr.kind == BEET_AST_EXPR_BINARY);
+  assert(binding.expr.binary_op == BEET_AST_BINARY_ADD);
+  assert(binding.expr.left != NULL);
+  assert(binding.expr.left->kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(binding.expr.left->text, "1", 1) == 0);
+  assert(binding.expr.right != NULL);
+  assert(binding.expr.right->kind == BEET_AST_EXPR_BINARY);
+  assert(binding.expr.right->binary_op == BEET_AST_BINARY_MUL);
+  assert(binding.expr.right->left != NULL);
+  assert(strncmp(binding.expr.right->left->text, "2", 1) == 0);
+  assert(binding.expr.right->right != NULL);
+  assert(strncmp(binding.expr.right->right->text, "3", 1) == 0);
 
   beet_source_file_dispose(&file);
 }
@@ -72,5 +110,6 @@ int main(void) {
   test_simple_bind();
   test_mutable_bind();
   test_typed_bind();
+  test_expression_bind();
   return 0;
 }

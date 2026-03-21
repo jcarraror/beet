@@ -3,6 +3,11 @@
 #include <assert.h>
 #include <string.h>
 
+typedef struct beet_ast_expr_pool {
+  beet_ast_expr *expr_nodes;
+  size_t *expr_count;
+} beet_ast_expr_pool;
+
 static void beet_parser_advance(beet_parser *parser) {
   parser->current = beet_lexer_next(&parser->lexer);
 }
@@ -29,64 +34,8 @@ void beet_parser_init(beet_parser *parser, const beet_source_file *file) {
   assert(file != NULL);
 
   beet_lexer_init(&parser->lexer, file);
+  parser->binding_expr_count = 0U;
   beet_parser_advance(parser);
-}
-
-int beet_parser_parse_binding(beet_parser *parser, beet_ast_binding *out) {
-  int is_mutable = 0;
-
-  assert(parser != NULL);
-  assert(out != NULL);
-
-  if (parser->current.kind == BEET_TOKEN_KW_BIND) {
-    is_mutable = 0;
-  } else if (parser->current.kind == BEET_TOKEN_KW_MUTABLE) {
-    is_mutable = 1;
-  } else {
-    return 0;
-  }
-
-  beet_parser_advance(parser);
-
-  if (parser->current.kind != BEET_TOKEN_IDENTIFIER) {
-    return 0;
-  }
-
-  out->name = parser->current.lexeme;
-  out->name_len = parser->current.lexeme_len;
-  out->is_mutable = is_mutable;
-  out->has_type = 0;
-  out->type_name = NULL;
-  out->type_name_len = 0U;
-
-  beet_parser_advance(parser);
-
-  if (beet_parser_match(parser, BEET_TOKEN_KW_IS)) {
-    if (parser->current.kind != BEET_TOKEN_IDENTIFIER) {
-      return 0;
-    }
-
-    out->has_type = 1;
-    out->type_name = parser->current.lexeme;
-    out->type_name_len = parser->current.lexeme_len;
-
-    beet_parser_advance(parser);
-  }
-
-  if (!beet_expect(parser, BEET_TOKEN_EQUAL)) {
-    return 0;
-  }
-
-  if (parser->current.kind == BEET_TOKEN_EOF) {
-    return 0;
-  }
-
-  out->value_text = parser->current.lexeme;
-  out->value_len = parser->current.lexeme_len;
-
-  beet_parser_advance(parser);
-
-  return 1;
 }
 
 static int beet_parser_parse_param(beet_parser *parser, beet_ast_param *out) {
@@ -116,6 +65,11 @@ static int beet_parser_parse_param(beet_parser *parser, beet_ast_param *out) {
   return 1;
 }
 
+static void beet_ast_expr_init(beet_ast_expr *expr);
+
+static int beet_parser_parse_expr(beet_parser *parser, beet_ast_expr_pool *pool,
+                                  beet_ast_expr *out);
+
 static void beet_ast_expr_init(beet_ast_expr *expr) {
   assert(expr != NULL);
 
@@ -144,6 +98,7 @@ static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
   stmt->binding.type_name_len = 0U;
   stmt->binding.value_text = NULL;
   stmt->binding.value_len = 0U;
+  beet_ast_expr_init(&stmt->binding.expr);
   stmt->assignment.name = NULL;
   stmt->assignment.name_len = 0U;
   stmt->assignment.is_resolved = 0;
@@ -159,29 +114,53 @@ static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
   stmt->loop_body_count = 0U;
 }
 
-static beet_ast_expr *beet_ast_expr_alloc(beet_ast_function *function) {
-  beet_ast_expr *expr;
+static beet_ast_expr_pool
+beet_ast_expr_pool_from_function(beet_ast_function *function) {
+  beet_ast_expr_pool pool;
 
   assert(function != NULL);
 
-  if (function->expr_count >= BEET_AST_MAX_EXPR_NODES) {
+  pool.expr_nodes = function->expr_nodes;
+  pool.expr_count = &function->expr_count;
+  return pool;
+}
+
+static beet_ast_expr_pool
+beet_ast_expr_pool_from_parser_binding(beet_parser *parser) {
+  beet_ast_expr_pool pool;
+
+  assert(parser != NULL);
+
+  pool.expr_nodes = parser->binding_expr_nodes;
+  pool.expr_count = &parser->binding_expr_count;
+  return pool;
+}
+
+static beet_ast_expr *beet_ast_expr_alloc(beet_ast_expr_pool *pool) {
+  beet_ast_expr *expr;
+
+  assert(pool != NULL);
+  assert(pool->expr_nodes != NULL);
+  assert(pool->expr_count != NULL);
+
+  if (*pool->expr_count >= BEET_AST_MAX_EXPR_NODES) {
     return NULL;
   }
 
-  expr = &function->expr_nodes[function->expr_count];
-  function->expr_count += 1U;
+  expr = &pool->expr_nodes[*pool->expr_count];
+  *pool->expr_count += 1U;
   beet_ast_expr_init(expr);
   return expr;
 }
 
-static beet_ast_expr *beet_ast_expr_store(beet_ast_function *function,
+static beet_ast_expr *beet_ast_expr_store(beet_ast_expr_pool *pool,
                                           const beet_ast_expr *source) {
   beet_ast_expr *expr;
 
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(source != NULL);
 
-  expr = beet_ast_expr_alloc(function);
+  expr = beet_ast_expr_alloc(pool);
   if (expr == NULL) {
     return NULL;
   }
@@ -205,20 +184,16 @@ static beet_ast_stmt *beet_ast_stmt_alloc(beet_ast_function *function) {
   return stmt;
 }
 
-static int beet_parser_parse_expr(beet_parser *parser,
-                                  beet_ast_function *function,
-                                  beet_ast_expr *out);
-
 static int beet_parser_parse_primary_expr(beet_parser *parser,
-                                          beet_ast_function *function,
+                                          beet_ast_expr_pool *pool,
                                           beet_ast_expr *out);
 
 static int beet_parser_parse_construct_expr(beet_parser *parser,
-                                            beet_ast_function *function,
+                                            beet_ast_expr_pool *pool,
                                             const beet_token *type_token,
                                             beet_ast_expr *out) {
   assert(parser != NULL);
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(type_token != NULL);
   assert(out != NULL);
 
@@ -251,12 +226,12 @@ static int beet_parser_parse_construct_expr(beet_parser *parser,
       return 0;
     }
 
-    value = beet_ast_expr_alloc(function);
+    value = beet_ast_expr_alloc(pool);
     if (value == NULL) {
       return 0;
     }
 
-    if (!beet_parser_parse_expr(parser, function, value)) {
+    if (!beet_parser_parse_expr(parser, pool, value)) {
       return 0;
     }
 
@@ -274,12 +249,12 @@ static int beet_parser_parse_construct_expr(beet_parser *parser,
 }
 
 static int beet_parser_parse_primary_expr(beet_parser *parser,
-                                          beet_ast_function *function,
+                                          beet_ast_expr_pool *pool,
                                           beet_ast_expr *out) {
   beet_token identifier_token;
 
   assert(parser != NULL);
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(out != NULL);
 
   beet_ast_expr_init(out);
@@ -304,8 +279,8 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
                     strncmp(identifier_token.lexeme, "false", 5U) == 0);
 
     if (!is_bool_name && parser->current.kind == BEET_TOKEN_LPAREN) {
-      return beet_parser_parse_construct_expr(parser, function,
-                                              &identifier_token, out);
+      return beet_parser_parse_construct_expr(parser, pool, &identifier_token,
+                                              out);
     }
 
     out->text = identifier_token.lexeme;
@@ -322,7 +297,7 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
   }
 
   if (beet_parser_match(parser, BEET_TOKEN_LPAREN)) {
-    if (!beet_parser_parse_expr(parser, function, out)) {
+    if (!beet_parser_parse_expr(parser, pool, out)) {
       return 0;
     }
 
@@ -333,13 +308,13 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
 }
 
 static int beet_parser_parse_postfix_expr(beet_parser *parser,
-                                          beet_ast_function *function,
+                                          beet_ast_expr_pool *pool,
                                           beet_ast_expr *out) {
   assert(parser != NULL);
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(out != NULL);
 
-  if (!beet_parser_parse_primary_expr(parser, function, out)) {
+  if (!beet_parser_parse_primary_expr(parser, pool, out)) {
     return 0;
   }
 
@@ -350,7 +325,7 @@ static int beet_parser_parse_postfix_expr(beet_parser *parser,
       return 0;
     }
 
-    base = beet_ast_expr_store(function, out);
+    base = beet_ast_expr_store(pool, out);
     if (base == NULL) {
       return 0;
     }
@@ -367,28 +342,28 @@ static int beet_parser_parse_postfix_expr(beet_parser *parser,
 }
 
 static int beet_parser_parse_unary_expr(beet_parser *parser,
-                                        beet_ast_function *function,
+                                        beet_ast_expr_pool *pool,
                                         beet_ast_expr *out) {
   beet_token operator_token;
   beet_ast_expr *operand;
 
   assert(parser != NULL);
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(out != NULL);
 
   if (parser->current.kind != BEET_TOKEN_MINUS) {
-    return beet_parser_parse_postfix_expr(parser, function, out);
+    return beet_parser_parse_postfix_expr(parser, pool, out);
   }
 
   operator_token = parser->current;
   beet_parser_advance(parser);
 
-  operand = beet_ast_expr_alloc(function);
+  operand = beet_ast_expr_alloc(pool);
   if (operand == NULL) {
     return 0;
   }
 
-  if (!beet_parser_parse_unary_expr(parser, function, operand)) {
+  if (!beet_parser_parse_unary_expr(parser, pool, operand)) {
     return 0;
   }
 
@@ -402,13 +377,13 @@ static int beet_parser_parse_unary_expr(beet_parser *parser,
 }
 
 static int beet_parser_parse_factor_expr(beet_parser *parser,
-                                         beet_ast_function *function,
+                                         beet_ast_expr_pool *pool,
                                          beet_ast_expr *out) {
   assert(parser != NULL);
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(out != NULL);
 
-  if (!beet_parser_parse_unary_expr(parser, function, out)) {
+  if (!beet_parser_parse_unary_expr(parser, pool, out)) {
     return 0;
   }
 
@@ -421,17 +396,17 @@ static int beet_parser_parse_factor_expr(beet_parser *parser,
     operator_token = parser->current;
     beet_parser_advance(parser);
 
-    left = beet_ast_expr_store(function, out);
+    left = beet_ast_expr_store(pool, out);
     if (left == NULL) {
       return 0;
     }
 
-    right = beet_ast_expr_alloc(function);
+    right = beet_ast_expr_alloc(pool);
     if (right == NULL) {
       return 0;
     }
 
-    if (!beet_parser_parse_unary_expr(parser, function, right)) {
+    if (!beet_parser_parse_unary_expr(parser, pool, right)) {
       return 0;
     }
 
@@ -450,13 +425,13 @@ static int beet_parser_parse_factor_expr(beet_parser *parser,
 }
 
 static int beet_parser_parse_term_expr(beet_parser *parser,
-                                       beet_ast_function *function,
+                                       beet_ast_expr_pool *pool,
                                        beet_ast_expr *out) {
   assert(parser != NULL);
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(out != NULL);
 
-  if (!beet_parser_parse_factor_expr(parser, function, out)) {
+  if (!beet_parser_parse_factor_expr(parser, pool, out)) {
     return 0;
   }
 
@@ -469,17 +444,17 @@ static int beet_parser_parse_term_expr(beet_parser *parser,
     operator_token = parser->current;
     beet_parser_advance(parser);
 
-    left = beet_ast_expr_store(function, out);
+    left = beet_ast_expr_store(pool, out);
     if (left == NULL) {
       return 0;
     }
 
-    right = beet_ast_expr_alloc(function);
+    right = beet_ast_expr_alloc(pool);
     if (right == NULL) {
       return 0;
     }
 
-    if (!beet_parser_parse_factor_expr(parser, function, right)) {
+    if (!beet_parser_parse_factor_expr(parser, pool, right)) {
       return 0;
     }
 
@@ -497,14 +472,13 @@ static int beet_parser_parse_term_expr(beet_parser *parser,
   return 1;
 }
 
-static int beet_parser_parse_expr(beet_parser *parser,
-                                  beet_ast_function *function,
+static int beet_parser_parse_expr(beet_parser *parser, beet_ast_expr_pool *pool,
                                   beet_ast_expr *out) {
   assert(parser != NULL);
-  assert(function != NULL);
+  assert(pool != NULL);
   assert(out != NULL);
 
-  if (!beet_parser_parse_term_expr(parser, function, out)) {
+  if (!beet_parser_parse_term_expr(parser, pool, out)) {
     return 0;
   }
 
@@ -521,17 +495,17 @@ static int beet_parser_parse_expr(beet_parser *parser,
     operator_token = parser->current;
     beet_parser_advance(parser);
 
-    left = beet_ast_expr_store(function, out);
+    left = beet_ast_expr_store(pool, out);
     if (left == NULL) {
       return 0;
     }
 
-    right = beet_ast_expr_alloc(function);
+    right = beet_ast_expr_alloc(pool);
     if (right == NULL) {
       return 0;
     }
 
-    if (!beet_parser_parse_term_expr(parser, function, right)) {
+    if (!beet_parser_parse_term_expr(parser, pool, right)) {
       return 0;
     }
 
@@ -566,6 +540,90 @@ static int beet_parser_parse_expr(beet_parser *parser,
   return 1;
 }
 
+static int beet_parser_parse_binding_with_pool(beet_parser *parser,
+                                               beet_ast_expr_pool *pool,
+                                               beet_ast_binding *out) {
+  int is_mutable = 0;
+
+  assert(parser != NULL);
+  assert(pool != NULL);
+  assert(out != NULL);
+
+  if (parser->current.kind == BEET_TOKEN_KW_BIND) {
+    is_mutable = 0;
+  } else if (parser->current.kind == BEET_TOKEN_KW_MUTABLE) {
+    is_mutable = 1;
+  } else {
+    return 0;
+  }
+
+  out->name = NULL;
+  out->name_len = 0U;
+  out->is_mutable = 0;
+  out->has_type = 0;
+  out->type_name = NULL;
+  out->type_name_len = 0U;
+  out->value_text = NULL;
+  out->value_len = 0U;
+  beet_ast_expr_init(&out->expr);
+
+  beet_parser_advance(parser);
+
+  if (parser->current.kind != BEET_TOKEN_IDENTIFIER) {
+    return 0;
+  }
+
+  out->name = parser->current.lexeme;
+  out->name_len = parser->current.lexeme_len;
+  out->is_mutable = is_mutable;
+
+  beet_parser_advance(parser);
+
+  if (beet_parser_match(parser, BEET_TOKEN_KW_IS)) {
+    if (parser->current.kind != BEET_TOKEN_IDENTIFIER) {
+      return 0;
+    }
+
+    out->has_type = 1;
+    out->type_name = parser->current.lexeme;
+    out->type_name_len = parser->current.lexeme_len;
+
+    beet_parser_advance(parser);
+  }
+
+  if (!beet_expect(parser, BEET_TOKEN_EQUAL)) {
+    return 0;
+  }
+
+  if (parser->current.kind == BEET_TOKEN_EOF) {
+    return 0;
+  }
+
+  if (!beet_parser_parse_expr(parser, pool, &out->expr)) {
+    return 0;
+  }
+
+  if (out->expr.kind == BEET_AST_EXPR_INT_LITERAL ||
+      out->expr.kind == BEET_AST_EXPR_BOOL_LITERAL ||
+      out->expr.kind == BEET_AST_EXPR_NAME) {
+    out->value_text = out->expr.text;
+    out->value_len = out->expr.text_len;
+  }
+
+  return 1;
+}
+
+int beet_parser_parse_binding(beet_parser *parser, beet_ast_binding *out) {
+  beet_ast_expr_pool pool;
+
+  assert(parser != NULL);
+  assert(out != NULL);
+
+  parser->binding_expr_count = 0U;
+  pool = beet_ast_expr_pool_from_parser_binding(parser);
+  return beet_parser_parse_binding_with_pool(parser, &pool, out);
+}
+
 static int beet_parser_parse_stmt(beet_parser *parser,
                                   beet_ast_function *function,
                                   beet_ast_stmt *out);
@@ -590,7 +648,10 @@ static int beet_parser_parse_assignment_stmt(beet_parser *parser,
     return 0;
   }
 
-  return beet_parser_parse_expr(parser, function, &out->expr);
+  {
+    beet_ast_expr_pool pool = beet_ast_expr_pool_from_function(function);
+    return beet_parser_parse_expr(parser, &pool, &out->expr);
+  }
 }
 
 static int beet_parser_parse_while_stmt(beet_parser *parser,
@@ -607,8 +668,11 @@ static int beet_parser_parse_while_stmt(beet_parser *parser,
   }
 
   out->kind = BEET_AST_STMT_WHILE;
-  if (!beet_parser_parse_expr(parser, function, &out->condition)) {
-    return 0;
+  {
+    beet_ast_expr_pool pool = beet_ast_expr_pool_from_function(function);
+    if (!beet_parser_parse_expr(parser, &pool, &out->condition)) {
+      return 0;
+    }
   }
 
   if (!beet_expect(parser, BEET_TOKEN_LBRACE)) {
@@ -657,8 +721,11 @@ static int beet_parser_parse_if_stmt(beet_parser *parser,
   }
 
   out->kind = BEET_AST_STMT_IF;
-  if (!beet_parser_parse_expr(parser, function, &out->condition)) {
-    return 0;
+  {
+    beet_ast_expr_pool pool = beet_ast_expr_pool_from_function(function);
+    if (!beet_parser_parse_expr(parser, &pool, &out->condition)) {
+      return 0;
+    }
   }
 
   if (!beet_expect(parser, BEET_TOKEN_LBRACE)) {
@@ -735,8 +802,10 @@ static int beet_parser_parse_stmt(beet_parser *parser,
 
   if (parser->current.kind == BEET_TOKEN_KW_BIND ||
       parser->current.kind == BEET_TOKEN_KW_MUTABLE) {
+    beet_ast_expr_pool pool = beet_ast_expr_pool_from_function(function);
+
     out->kind = BEET_AST_STMT_BINDING;
-    return beet_parser_parse_binding(parser, &out->binding);
+    return beet_parser_parse_binding_with_pool(parser, &pool, &out->binding);
   }
 
   if (parser->current.kind == BEET_TOKEN_IDENTIFIER) {
@@ -744,9 +813,11 @@ static int beet_parser_parse_stmt(beet_parser *parser,
   }
 
   if (parser->current.kind == BEET_TOKEN_KW_RETURN) {
+    beet_ast_expr_pool pool = beet_ast_expr_pool_from_function(function);
+
     out->kind = BEET_AST_STMT_RETURN;
     beet_parser_advance(parser);
-    return beet_parser_parse_expr(parser, function, &out->expr);
+    return beet_parser_parse_expr(parser, &pool, &out->expr);
   }
 
   if (parser->current.kind == BEET_TOKEN_KW_IF) {

@@ -14,69 +14,6 @@ typedef struct beet_local_type {
 
 #define BEET_TYPE_CHECK_MAX_LOCALS 128
 
-static beet_type beet_type_from_value_text(const char *text, size_t len) {
-  beet_type type;
-  size_t i;
-  int saw_dot = 0;
-
-  assert(text != NULL);
-
-  type.kind = BEET_TYPE_INVALID;
-  type.name = NULL;
-
-  if (len == 4U && strncmp(text, "true", 4U) == 0) {
-    type.kind = BEET_TYPE_BOOL;
-    type.name = "Bool";
-    return type;
-  }
-
-  if (len == 5U && strncmp(text, "false", 5U) == 0) {
-    type.kind = BEET_TYPE_BOOL;
-    type.name = "Bool";
-    return type;
-  }
-
-  if (len == 2U && strncmp(text, "()", 2U) == 0) {
-    type.kind = BEET_TYPE_UNIT;
-    type.name = "Unit";
-    return type;
-  }
-
-  if (len == 0U) {
-    return type;
-  }
-
-  for (i = 0U; i < len; ++i) {
-    if (text[i] == '.') {
-      if (saw_dot) {
-        return type;
-      }
-      saw_dot = 1;
-      continue;
-    }
-
-    if (!isdigit((unsigned char)text[i])) {
-      return type;
-    }
-  }
-
-  if (saw_dot) {
-    type.kind = BEET_TYPE_FLOAT;
-    type.name = "Float";
-  } else {
-    type.kind = BEET_TYPE_INT;
-    type.name = "Int";
-  }
-
-  return type;
-}
-
-beet_type beet_type_check_binding(const beet_ast_binding *binding) {
-  assert(binding != NULL);
-
-  return beet_type_from_value_text(binding->value_text, binding->value_len);
-}
-
 static int beet_name_equals_slice(const char *left, size_t left_len,
                                   const char *right, size_t right_len) {
   return left_len == right_len && strncmp(left, right, left_len) == 0;
@@ -366,8 +303,23 @@ static beet_type beet_type_check_expr(const beet_ast_expr *expr,
   }
 }
 
+static beet_type beet_type_check_binding_in_context(
+    const beet_ast_binding *binding, const beet_local_type *locals,
+    size_t local_count, const beet_ast_type_decl *type_decls,
+    size_t decl_count) {
+  assert(binding != NULL);
+
+  return beet_type_check_expr(&binding->expr, locals, local_count, type_decls,
+                              decl_count);
+}
+
+beet_type beet_type_check_binding(const beet_ast_binding *binding) {
+  return beet_type_check_binding_in_context(binding, NULL, 0U, NULL, 0U);
+}
+
 static beet_type_check_result beet_type_check_binding_annotation_in_context(
-    const beet_ast_binding *binding, const beet_ast_type_decl *type_decls,
+    const beet_ast_binding *binding, const beet_local_type *locals,
+    size_t local_count, const beet_ast_type_decl *type_decls,
     size_t decl_count) {
   beet_type_check_result result;
 
@@ -375,7 +327,8 @@ static beet_type_check_result beet_type_check_binding_annotation_in_context(
 
   result.ok = 1;
   result.declared_type = beet_invalid_type();
-  result.value_type = beet_type_check_binding(binding);
+  result.value_type = beet_type_check_binding_in_context(
+      binding, locals, local_count, type_decls, decl_count);
 
   if (!binding->has_type) {
     return result;
@@ -419,13 +372,14 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
 
       if (stmt->binding.has_type) {
         result = beet_type_check_binding_annotation_in_context(
-            &stmt->binding, type_decls, decl_count);
+            &stmt->binding, locals, *local_count, type_decls, decl_count);
         if (!result.ok) {
           return 0;
         }
         binding_type = result.declared_type;
       } else {
-        binding_type = beet_type_check_binding(&stmt->binding);
+        binding_type = beet_type_check_binding_in_context(
+            &stmt->binding, locals, *local_count, type_decls, decl_count);
         if (!beet_type_is_valid(&binding_type)) {
           return 0;
         }
@@ -532,7 +486,8 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
 
 beet_type_check_result
 beet_type_check_binding_annotation(const beet_ast_binding *binding) {
-  return beet_type_check_binding_annotation_in_context(binding, NULL, 0U);
+  return beet_type_check_binding_annotation_in_context(binding, NULL, 0U, NULL,
+                                                       0U);
 }
 
 int beet_type_check_function_signature_with_type_decls(

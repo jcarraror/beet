@@ -120,6 +120,8 @@ static void test_function_body_bindings(void) {
   assert(strncmp(function_ast.body[0].binding.name, "x", 1) == 0);
   assert(function_ast.body[0].binding.value_len == 2U);
   assert(strncmp(function_ast.body[0].binding.value_text, "10", 2) == 0);
+  assert(function_ast.body[0].binding.expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[0].binding.expr.text, "10", 2) == 0);
 
   assert(function_ast.body[1].kind == BEET_AST_STMT_BINDING);
   assert(function_ast.body[1].binding.is_mutable == 1);
@@ -130,11 +132,47 @@ static void test_function_body_bindings(void) {
   assert(strncmp(function_ast.body[1].binding.type_name, "Int", 3) == 0);
   assert(function_ast.body[1].binding.value_len == 2U);
   assert(strncmp(function_ast.body[1].binding.value_text, "25", 2) == 0);
+  assert(function_ast.body[1].binding.expr.kind == BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[1].binding.expr.text, "25", 2) == 0);
 
   assert(function_ast.body[2].kind == BEET_AST_STMT_RETURN);
   assert(function_ast.body[2].expr.kind == BEET_AST_EXPR_NAME);
   assert(function_ast.body[2].expr.text_len == 5U);
   assert(strncmp(function_ast.body[2].expr.text, "total", 5) == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_function_body_binding_expression(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind total = 1 + 2 * 3\n"
+                     "    return total\n"
+                     "}\n";
+
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(function_ast.body_count == 2U);
+  assert(function_ast.body[0].kind == BEET_AST_STMT_BINDING);
+  assert(function_ast.body[0].binding.value_text == NULL);
+  assert(function_ast.body[0].binding.value_len == 0U);
+  assert(function_ast.body[0].binding.expr.kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[0].binding.expr.binary_op == BEET_AST_BINARY_ADD);
+  assert(function_ast.body[0].binding.expr.left != NULL);
+  assert(function_ast.body[0].binding.expr.left->kind ==
+         BEET_AST_EXPR_INT_LITERAL);
+  assert(strncmp(function_ast.body[0].binding.expr.left->text, "1", 1) == 0);
+  assert(function_ast.body[0].binding.expr.right != NULL);
+  assert(function_ast.body[0].binding.expr.right->kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[0].binding.expr.right->binary_op ==
+         BEET_AST_BINARY_MUL);
 
   beet_source_file_dispose(&file);
 }
@@ -485,6 +523,7 @@ int main(void) {
   test_function_with_params();
   test_name_return_function();
   test_function_body_bindings();
+  test_function_body_binding_expression();
   test_assignment_statement_function();
   test_expression_precedence_function();
   test_unary_and_grouped_expression_function();

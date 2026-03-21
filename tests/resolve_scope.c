@@ -252,6 +252,35 @@ static void test_resolve_names_inside_structure_construction(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_resolve_binding_expression_uses_prior_local(void) {
+  const char *text = "function main() returns Int {\n"
+                     "    bind x = 1\n"
+                     "    bind y = x + 2\n"
+                     "    return y\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+
+  assert(function_ast.body[1].kind == BEET_AST_STMT_BINDING);
+  assert(function_ast.body[1].binding.expr.kind == BEET_AST_EXPR_BINARY);
+  assert(function_ast.body[1].binding.expr.left != NULL);
+  assert(function_ast.body[1].binding.expr.left->kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[1].binding.expr.left->is_resolved == 1);
+  assert(function_ast.body[1].binding.expr.left->resolved_depth == 0U);
+  assert(function_ast.body[2].expr.kind == BEET_AST_EXPR_NAME);
+  assert(function_ast.body[2].expr.is_resolved == 1);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_reject_missing_return_name(void) {
   const char *text = "function main() returns Int {\n"
                      "    return missing\n"
@@ -300,6 +329,7 @@ int main(void) {
   test_resolve_assignment_in_else_branch();
   test_resolve_field_access_on_param();
   test_resolve_names_inside_structure_construction();
+  test_resolve_binding_expression_uses_prior_local();
   test_resolve_if_condition_bool_literal();
   test_reject_missing_return_name();
   test_reject_missing_assignment_target();

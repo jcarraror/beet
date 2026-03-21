@@ -7,6 +7,8 @@
 typedef struct beet_parser {
   beet_lexer lexer;
   beet_token current;
+  beet_ast_expr binding_expr_nodes[BEET_AST_MAX_EXPR_NODES];
+  size_t binding_expr_count;
 } beet_parser;
 
 void beet_parser_init(beet_parser *parser, const beet_source_file *file);

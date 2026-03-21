@@ -341,7 +341,12 @@ int beet_mir_lower_binding(beet_mir_function *function,
   assert(function != NULL);
   assert(binding != NULL);
 
-  if (!beet_parse_int_slice(binding->value_text, binding->value_len, &value)) {
+  if (binding->expr.kind != BEET_AST_EXPR_INT_LITERAL) {
+    return 0;
+  }
+
+  if (!beet_parse_int_slice(binding->expr.text, binding->expr.text_len,
+                            &value)) {
     return 0;
   }
 
