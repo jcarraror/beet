@@ -332,6 +332,28 @@ int beet_mir_lower_binding(beet_mir_function *function,
   return 1;
 }
 
+static int
+beet_mir_register_param_locals(beet_mir_function *function,
+                               const beet_ast_function *function_ast) {
+  size_t i;
+
+  assert(function != NULL);
+  assert(function_ast != NULL);
+
+  for (i = 0U; i < function_ast->param_count; ++i) {
+    if (function->local_count >= BEET_MIR_MAX_LOCALS) {
+      return 0;
+    }
+
+    beet_copy_name(function->locals[function->local_count],
+                   function_ast->params[i].name,
+                   function_ast->params[i].name_len);
+    function->local_count += 1U;
+  }
+
+  return 1;
+}
+
 static int beet_mir_lower_expr(beet_mir_function *function,
                                const beet_ast_expr *expr, int *out_temp) {
   int lhs_temp;
@@ -532,6 +554,10 @@ int beet_mir_lower_function(beet_mir_function *function,
   assert(function_ast != NULL);
 
   beet_mir_function_init(function, function_ast->name, function_ast->name_len);
+  if (!beet_mir_register_param_locals(function, function_ast)) {
+    return 0;
+  }
+
   return beet_mir_lower_stmt_list(function, function_ast->body,
                                   function_ast->body_count);
 }

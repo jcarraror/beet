@@ -15,7 +15,10 @@ typedef enum beet_bc_opcode {
   BEET_BC_OP_DIV_INT = 7,
   BEET_BC_OP_RETURN_LOCAL = 8,
   BEET_BC_OP_RETURN_TEMP = 9,
-  BEET_BC_OP_RETURN_CONST_INT = 10
+  BEET_BC_OP_RETURN_CONST_INT = 10,
+  BEET_BC_OP_LABEL = 11,
+  BEET_BC_OP_JUMP = 12,
+  BEET_BC_OP_JUMP_IF_FALSE = 13
 } beet_bc_opcode;
 
 typedef struct beet_bytecode_function {

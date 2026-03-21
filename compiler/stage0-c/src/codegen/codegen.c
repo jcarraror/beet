@@ -27,6 +27,7 @@ int beet_codegen_function(const beet_mir_function *mir_function,
   assert(bytecode_function != NULL);
 
   beet_bytecode_function_init(bytecode_function);
+  bytecode_function->local_count = mir_function->local_count;
 
   for (i = 0U; i < mir_function->instr_count; ++i) {
     const beet_mir_instr *instr = &mir_function->instrs[i];
@@ -93,6 +94,27 @@ int beet_codegen_function(const beet_mir_function *mir_function,
       if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_DIV_INT,
                                          instr->dst, instr->src_lhs,
                                          instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_LABEL:
+      if (!beet_bytecode_emit2(bytecode_function, BEET_BC_OP_LABEL,
+                               instr->int_value)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_JUMP:
+      if (!beet_bytecode_emit2(bytecode_function, BEET_BC_OP_JUMP,
+                               instr->int_value)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_JUMP_IF_FALSE:
+      if (!beet_bytecode_emit3(bytecode_function, BEET_BC_OP_JUMP_IF_FALSE,
+                               instr->dst, instr->int_value)) {
         return 0;
       }
       break;
