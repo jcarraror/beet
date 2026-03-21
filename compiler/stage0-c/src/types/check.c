@@ -238,7 +238,9 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
     case BEET_AST_STMT_IF: {
       beet_type condition_type;
       beet_local_type branch_locals[BEET_TYPE_CHECK_MAX_LOCALS];
+      beet_local_type else_locals[BEET_TYPE_CHECK_MAX_LOCALS];
       size_t branch_local_count;
+      size_t else_local_count;
 
       condition_type =
           beet_type_check_expr(&stmt->condition, locals, *local_count);
@@ -251,6 +253,14 @@ static int beet_type_check_stmt_list(const beet_ast_stmt *stmts,
       if (!beet_type_check_stmt_list(stmt->then_body, stmt->then_body_count,
                                      return_type, branch_locals,
                                      &branch_local_count)) {
+        return 0;
+      }
+
+      memcpy(else_locals, locals, sizeof(beet_local_type) * (*local_count));
+      else_local_count = *local_count;
+      if (!beet_type_check_stmt_list(stmt->else_body, stmt->else_body_count,
+                                     return_type, else_locals,
+                                     &else_local_count)) {
         return 0;
       }
       break;

@@ -145,7 +145,10 @@ int beet_mir_add_binary_int(beet_mir_function *function, beet_mir_opcode op,
   assert(function != NULL);
 
   if (op != BEET_MIR_OP_ADD_INT && op != BEET_MIR_OP_SUB_INT &&
-      op != BEET_MIR_OP_MUL_INT && op != BEET_MIR_OP_DIV_INT) {
+      op != BEET_MIR_OP_MUL_INT && op != BEET_MIR_OP_DIV_INT &&
+      op != BEET_MIR_OP_EQ_INT && op != BEET_MIR_OP_NE_INT &&
+      op != BEET_MIR_OP_LT_INT && op != BEET_MIR_OP_LE_INT &&
+      op != BEET_MIR_OP_GT_INT && op != BEET_MIR_OP_GE_INT) {
     return -1;
   }
 
@@ -442,6 +445,36 @@ static int beet_mir_lower_expr(beet_mir_function *function,
                                           lhs_temp, rhs_temp);
       return *out_temp >= 0;
 
+    case BEET_AST_BINARY_EQ:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_EQ_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_NE:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_NE_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_LT:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_LT_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_LE:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_LE_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_GT:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_GT_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
+    case BEET_AST_BINARY_GE:
+      *out_temp = beet_mir_add_binary_int(function, BEET_MIR_OP_GE_INT,
+                                          lhs_temp, rhs_temp);
+      return *out_temp >= 0;
+
     default:
       return 0;
     }
@@ -536,6 +569,7 @@ static int beet_mir_lower_while_stmt(beet_mir_function *function,
 static int beet_mir_lower_if_stmt(beet_mir_function *function,
                                   const beet_ast_stmt *stmt) {
   int condition_temp;
+  int else_label;
   int end_label;
 
   assert(function != NULL);
@@ -546,13 +580,31 @@ static int beet_mir_lower_if_stmt(beet_mir_function *function,
     return 0;
   }
 
-  end_label = beet_mir_next_label(function);
-  if (!beet_mir_add_jump_if_false(function, condition_temp, end_label)) {
+  else_label = beet_mir_next_label(function);
+  if (!beet_mir_add_jump_if_false(function, condition_temp, else_label)) {
     return 0;
   }
 
   if (!beet_mir_lower_stmt_list(function, stmt->then_body,
                                 stmt->then_body_count)) {
+    return 0;
+  }
+
+  if (stmt->else_body_count == 0U) {
+    return beet_mir_add_label(function, else_label);
+  }
+
+  end_label = beet_mir_next_label(function);
+  if (!beet_mir_add_jump(function, end_label)) {
+    return 0;
+  }
+
+  if (!beet_mir_add_label(function, else_label)) {
+    return 0;
+  }
+
+  if (!beet_mir_lower_stmt_list(function, stmt->else_body,
+                                stmt->else_body_count)) {
     return 0;
   }
 
