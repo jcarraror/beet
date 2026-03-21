@@ -286,3 +286,23 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "3"
 )
+
+add_test(
+    NAME driver_return_option_some
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_option_some.beet
+)
+set_tests_properties(
+    driver_return_option_some
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "7"
+)
+
+add_test(
+    NAME driver_return_outcome_error
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_outcome_error.beet
+)
+set_tests_properties(
+    driver_return_outcome_error
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "9"
+)

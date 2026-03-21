@@ -1,0 +1,17 @@
+type OptionInt = choice {
+    none
+    some(Int)
+}
+
+function main() returns Int {
+    bind value is OptionInt = OptionInt.some(7)
+    match value {
+        case none {
+            return 0
+        }
+        case some(item) {
+            return item
+        }
+    }
+    return 1
+}

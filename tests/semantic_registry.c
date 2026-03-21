@@ -84,7 +84,8 @@ static void test_registry_shared_across_frontend_layers(void) {
   assert(functions[1].body[1].match_expr.kind == BEET_AST_EXPR_NAME);
   assert(functions[1].body[1].match_expr.is_resolved == 1);
   assert(functions[1].body[1].match_case_count == 2U);
-  assert(functions[1].body[1].match_cases[1].body[0].expr.call_is_resolved == 1);
+  assert(functions[1].body[1].match_cases[1].body[0].expr.call_is_resolved ==
+         1);
   assert(strcmp(mir_function.locals[0], "value.tag") == 0);
 
   beet_source_file_dispose(&file);

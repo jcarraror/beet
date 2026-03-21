@@ -1,0 +1,17 @@
+type OutcomeInt = choice {
+    ok(Int)
+    error(Int)
+}
+
+function main() returns Int {
+    bind value is OutcomeInt = OutcomeInt.error(9)
+    match value {
+        case ok(item) {
+            return item
+        }
+        case error(problem) {
+            return problem
+        }
+    }
+    return 1
+}
