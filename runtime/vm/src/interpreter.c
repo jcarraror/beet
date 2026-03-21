@@ -15,6 +15,12 @@ static size_t beet_vm_instr_width(int op) {
   case BEET_BC_OP_SUB_INT:
   case BEET_BC_OP_MUL_INT:
   case BEET_BC_OP_DIV_INT:
+  case BEET_BC_OP_EQ_INT:
+  case BEET_BC_OP_NE_INT:
+  case BEET_BC_OP_LT_INT:
+  case BEET_BC_OP_LE_INT:
+  case BEET_BC_OP_GT_INT:
+  case BEET_BC_OP_GE_INT:
     return 4U;
 
   case BEET_BC_OP_RETURN_LOCAL:
@@ -126,6 +132,54 @@ int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
         return 0;
       }
       vm->regs[dst] = vm->regs[lhs] / vm->regs[rhs];
+      break;
+    }
+
+    case BEET_BC_OP_EQ_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = (vm->regs[lhs] == vm->regs[rhs]) ? 1 : 0;
+      break;
+    }
+
+    case BEET_BC_OP_NE_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = (vm->regs[lhs] != vm->regs[rhs]) ? 1 : 0;
+      break;
+    }
+
+    case BEET_BC_OP_LT_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = (vm->regs[lhs] < vm->regs[rhs]) ? 1 : 0;
+      break;
+    }
+
+    case BEET_BC_OP_LE_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = (vm->regs[lhs] <= vm->regs[rhs]) ? 1 : 0;
+      break;
+    }
+
+    case BEET_BC_OP_GT_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = (vm->regs[lhs] > vm->regs[rhs]) ? 1 : 0;
+      break;
+    }
+
+    case BEET_BC_OP_GE_INT: {
+      int dst = function->code[pc++];
+      int lhs = function->code[pc++];
+      int rhs = function->code[pc++];
+      vm->regs[dst] = (vm->regs[lhs] >= vm->regs[rhs]) ? 1 : 0;
       break;
     }
 

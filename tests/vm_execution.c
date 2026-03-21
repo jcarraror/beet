@@ -95,6 +95,64 @@ static void test_divide_by_zero_fails(void) {
   assert(!beet_vm_execute(&vm, &fn, &result));
 }
 
+static void test_comparison_return_temp(void) {
+  beet_bytecode_function fn;
+  beet_vm vm;
+  int result;
+
+  beet_bytecode_function_init(&fn);
+
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 0, 1));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 1, 2));
+  assert(beet_bytecode_emit4(&fn, BEET_BC_OP_LT_INT, 2, 0, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_TEMP, 2));
+
+  assert(beet_vm_execute(&vm, &fn, &result));
+  assert(result == 1);
+}
+
+static void test_if_else_comparison_branch(void) {
+  beet_bytecode_function fn;
+  beet_vm vm;
+  int result;
+
+  beet_bytecode_function_init(&fn);
+
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 0, 3));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 1, 2));
+  assert(beet_bytecode_emit4(&fn, BEET_BC_OP_GT_INT, 2, 0, 1));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_JUMP_IF_FALSE, 2, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 7));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_JUMP, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 9));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 1));
+
+  assert(beet_vm_execute(&vm, &fn, &result));
+  assert(result == 7);
+}
+
+static void test_if_else_comparison_falls_to_else(void) {
+  beet_bytecode_function fn;
+  beet_vm vm;
+  int result;
+
+  beet_bytecode_function_init(&fn);
+
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 0, 1));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_CONST_INT, 1, 2));
+  assert(beet_bytecode_emit4(&fn, BEET_BC_OP_GT_INT, 2, 0, 1));
+  assert(beet_bytecode_emit3(&fn, BEET_BC_OP_JUMP_IF_FALSE, 2, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 7));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_JUMP, 1));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 9));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 1));
+
+  assert(beet_vm_execute(&vm, &fn, &result));
+  assert(result == 9);
+}
+
 static void test_jump_skips_instructions(void) {
   beet_bytecode_function fn;
   beet_vm vm;
@@ -201,6 +259,9 @@ int main(void) {
   test_arithmetic_return_temp();
   test_load_local_and_return_temp();
   test_divide_by_zero_fails();
+  test_comparison_return_temp();
+  test_if_else_comparison_branch();
+  test_if_else_comparison_falls_to_else();
   test_jump_skips_instructions();
   test_jump_if_false_takes_branch();
   test_jump_if_false_falls_through_on_true();
