@@ -63,7 +63,10 @@ int beet_bytecode_emit_binary_int(beet_bytecode_function *function,
                                   beet_bc_opcode opcode, int dst_temp,
                                   int lhs_temp, int rhs_temp) {
   if (opcode != BEET_BC_OP_ADD_INT && opcode != BEET_BC_OP_SUB_INT &&
-      opcode != BEET_BC_OP_MUL_INT && opcode != BEET_BC_OP_DIV_INT) {
+      opcode != BEET_BC_OP_MUL_INT && opcode != BEET_BC_OP_DIV_INT &&
+      opcode != BEET_BC_OP_EQ_INT && opcode != BEET_BC_OP_NE_INT &&
+      opcode != BEET_BC_OP_LT_INT && opcode != BEET_BC_OP_LE_INT &&
+      opcode != BEET_BC_OP_GT_INT && opcode != BEET_BC_OP_GE_INT) {
     return 0;
   }
 

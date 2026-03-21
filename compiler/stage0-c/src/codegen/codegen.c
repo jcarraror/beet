@@ -98,6 +98,54 @@ int beet_codegen_function(const beet_mir_function *mir_function,
       }
       break;
 
+    case BEET_MIR_OP_EQ_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_EQ_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_NE_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_NE_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_LT_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_LT_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_LE_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_LE_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_GT_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_GT_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
+    case BEET_MIR_OP_GE_INT:
+      if (!beet_bytecode_emit_binary_int(bytecode_function, BEET_BC_OP_GE_INT,
+                                         instr->dst, instr->src_lhs,
+                                         instr->src_rhs)) {
+        return 0;
+      }
+      break;
+
     case BEET_MIR_OP_LABEL:
       if (!beet_bytecode_emit2(bytecode_function, BEET_BC_OP_LABEL,
                                instr->int_value)) {

@@ -213,6 +213,44 @@ static void test_codegen_lowered_arithmetic_with_local_load(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_codegen_lowered_comparison_return_expression(void) {
+  const char *text = "function main() returns Bool {\n"
+                     "    return 1 < 2\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+  assert(beet_codegen_function(&mir_function, &bytecode_function));
+
+  assert(bytecode_function.code_count == 12U);
+  assert(bytecode_function.code[0] == BEET_BC_OP_CONST_INT);
+  assert(bytecode_function.code[1] == 0);
+  assert(bytecode_function.code[2] == 1);
+  assert(bytecode_function.code[3] == BEET_BC_OP_CONST_INT);
+  assert(bytecode_function.code[4] == 1);
+  assert(bytecode_function.code[5] == 2);
+  assert(bytecode_function.code[6] == BEET_BC_OP_LT_INT);
+  assert(bytecode_function.code[7] == 2);
+  assert(bytecode_function.code[8] == 0);
+  assert(bytecode_function.code[9] == 1);
+  assert(bytecode_function.code[10] == BEET_BC_OP_RETURN_TEMP);
+  assert(bytecode_function.code[11] == 2);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_codegen_lowered_if_statement(void) {
   const char *text = "function choose(flag is Bool) returns Int {\n"
                      "    if flag {\n"
@@ -251,6 +289,53 @@ static void test_codegen_lowered_if_statement(void) {
   assert(bytecode_function.code[9] == 0);
   assert(bytecode_function.code[10] == BEET_BC_OP_RETURN_CONST_INT);
   assert(bytecode_function.code[11] == 0);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_codegen_lowered_if_else_statement(void) {
+  const char *text = "function choose(flag is Bool) returns Int {\n"
+                     "    if flag {\n"
+                     "        return 1\n"
+                     "    } else {\n"
+                     "        return 2\n"
+                     "    }\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+  beet_mir_function mir_function;
+  beet_bytecode_function bytecode_function;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+  assert(beet_resolve_function(&function_ast));
+  assert(beet_type_check_function_signature(&function_ast));
+  assert(beet_type_check_function_body(&function_ast));
+  assert(beet_mir_lower_function(&mir_function, &function_ast));
+  assert(beet_codegen_function(&mir_function, &bytecode_function));
+
+  assert(bytecode_function.local_count == 1U);
+  assert(bytecode_function.code_count == 16U);
+  assert(bytecode_function.code[0] == BEET_BC_OP_LOAD_LOCAL);
+  assert(bytecode_function.code[1] == 0);
+  assert(bytecode_function.code[2] == 0);
+  assert(bytecode_function.code[3] == BEET_BC_OP_JUMP_IF_FALSE);
+  assert(bytecode_function.code[4] == 0);
+  assert(bytecode_function.code[5] == 0);
+  assert(bytecode_function.code[6] == BEET_BC_OP_RETURN_CONST_INT);
+  assert(bytecode_function.code[7] == 1);
+  assert(bytecode_function.code[8] == BEET_BC_OP_JUMP);
+  assert(bytecode_function.code[9] == 1);
+  assert(bytecode_function.code[10] == BEET_BC_OP_LABEL);
+  assert(bytecode_function.code[11] == 0);
+  assert(bytecode_function.code[12] == BEET_BC_OP_RETURN_CONST_INT);
+  assert(bytecode_function.code[13] == 2);
+  assert(bytecode_function.code[14] == BEET_BC_OP_LABEL);
+  assert(bytecode_function.code[15] == 1);
 
   beet_source_file_dispose(&file);
 }
@@ -307,7 +392,9 @@ int main(void) {
   test_codegen_lowered_function_return_local();
   test_codegen_lowered_arithmetic_return_expression();
   test_codegen_lowered_arithmetic_with_local_load();
+  test_codegen_lowered_comparison_return_expression();
   test_codegen_lowered_if_statement();
+  test_codegen_lowered_if_else_statement();
   test_codegen_lowered_while_statement();
   return 0;
 }
