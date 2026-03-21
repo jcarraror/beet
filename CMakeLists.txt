@@ -217,3 +217,24 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "9"
 )
+
+
+add_test(
+    NAME driver_count_to_three
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/count_to_three.beet
+)
+set_tests_properties(
+    driver_count_to_three
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "3"
+)
+
+add_test(
+    NAME driver_accumulate_to_six
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/accumulate_to_six.beet
+)
+set_tests_properties(
+    driver_accumulate_to_six
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "6"
+)
