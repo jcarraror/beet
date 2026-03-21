@@ -327,9 +327,9 @@ static int beet_parser_parse_factor_expr(beet_parser *parser,
   return 1;
 }
 
-static int beet_parser_parse_expr(beet_parser *parser,
-                                  beet_ast_function *function,
-                                  beet_ast_expr *out) {
+static int beet_parser_parse_term_expr(beet_parser *parser,
+                                       beet_ast_function *function,
+                                       beet_ast_expr *out) {
   assert(parser != NULL);
   assert(function != NULL);
   assert(out != NULL);
@@ -368,6 +368,75 @@ static int beet_parser_parse_expr(beet_parser *parser,
     out->binary_op = operator_token.kind == BEET_TOKEN_PLUS
                          ? BEET_AST_BINARY_ADD
                          : BEET_AST_BINARY_SUB;
+    out->left = left;
+    out->right = right;
+  }
+
+  return 1;
+}
+
+static int beet_parser_parse_expr(beet_parser *parser,
+                                  beet_ast_function *function,
+                                  beet_ast_expr *out) {
+  assert(parser != NULL);
+  assert(function != NULL);
+  assert(out != NULL);
+
+  if (!beet_parser_parse_term_expr(parser, function, out)) {
+    return 0;
+  }
+
+  while (parser->current.kind == BEET_TOKEN_EQUAL_EQUAL ||
+         parser->current.kind == BEET_TOKEN_BANG_EQUAL ||
+         parser->current.kind == BEET_TOKEN_LESS ||
+         parser->current.kind == BEET_TOKEN_LESS_EQUAL ||
+         parser->current.kind == BEET_TOKEN_GREATER ||
+         parser->current.kind == BEET_TOKEN_GREATER_EQUAL) {
+    beet_token operator_token;
+    beet_ast_expr *left;
+    beet_ast_expr *right;
+
+    operator_token = parser->current;
+    beet_parser_advance(parser);
+
+    left = beet_ast_expr_store(function, out);
+    if (left == NULL) {
+      return 0;
+    }
+
+    right = beet_ast_expr_alloc(function);
+    if (right == NULL) {
+      return 0;
+    }
+
+    if (!beet_parser_parse_term_expr(parser, function, right)) {
+      return 0;
+    }
+
+    beet_ast_expr_init(out);
+    out->kind = BEET_AST_EXPR_BINARY;
+    out->text = operator_token.lexeme;
+    out->text_len = operator_token.lexeme_len;
+    switch (operator_token.kind) {
+    case BEET_TOKEN_EQUAL_EQUAL:
+      out->binary_op = BEET_AST_BINARY_EQ;
+      break;
+    case BEET_TOKEN_BANG_EQUAL:
+      out->binary_op = BEET_AST_BINARY_NE;
+      break;
+    case BEET_TOKEN_LESS:
+      out->binary_op = BEET_AST_BINARY_LT;
+      break;
+    case BEET_TOKEN_LESS_EQUAL:
+      out->binary_op = BEET_AST_BINARY_LE;
+      break;
+    case BEET_TOKEN_GREATER:
+      out->binary_op = BEET_AST_BINARY_GT;
+      break;
+    default:
+      out->binary_op = BEET_AST_BINARY_GE;
+      break;
+    }
     out->left = left;
     out->right = right;
   }

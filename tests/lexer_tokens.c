@@ -190,6 +190,39 @@ static void test_arithmetic_operator_tokens(void) {
                sizeof(expected) / sizeof(expected[0]));
 }
 
+static void test_comparison_operator_tokens(void) {
+  static const char *text = "function main() returns Bool {\n"
+                            "    return 1 == 2 != 3 < 4 <= 5 > 6 >= 7\n"
+                            "}\n";
+
+  static const expected_token expected[] = {
+      {BEET_TOKEN_KW_FUNCTION, "function"},
+      {BEET_TOKEN_IDENTIFIER, "main"},
+      {BEET_TOKEN_LPAREN, "("},
+      {BEET_TOKEN_RPAREN, ")"},
+      {BEET_TOKEN_KW_RETURNS, "returns"},
+      {BEET_TOKEN_IDENTIFIER, "Bool"},
+      {BEET_TOKEN_LBRACE, "{"},
+      {BEET_TOKEN_KW_RETURN, "return"},
+      {BEET_TOKEN_INT_LITERAL, "1"},
+      {BEET_TOKEN_EQUAL_EQUAL, "=="},
+      {BEET_TOKEN_INT_LITERAL, "2"},
+      {BEET_TOKEN_BANG_EQUAL, "!="},
+      {BEET_TOKEN_INT_LITERAL, "3"},
+      {BEET_TOKEN_LESS, "<"},
+      {BEET_TOKEN_INT_LITERAL, "4"},
+      {BEET_TOKEN_LESS_EQUAL, "<="},
+      {BEET_TOKEN_INT_LITERAL, "5"},
+      {BEET_TOKEN_GREATER, ">"},
+      {BEET_TOKEN_INT_LITERAL, "6"},
+      {BEET_TOKEN_GREATER_EQUAL, ">="},
+      {BEET_TOKEN_INT_LITERAL, "7"},
+      {BEET_TOKEN_RBRACE, "}"}};
+
+  check_tokens("comparison_tokens.beet", text, expected,
+               sizeof(expected) / sizeof(expected[0]));
+}
+
 int main(void) {
   test_binding_and_function_tokens();
   test_type_and_structure_tokens();
@@ -197,5 +230,6 @@ int main(void) {
   test_unknown_character_yields_error();
   test_control_flow_keyword_tokens();
   test_arithmetic_operator_tokens();
+  test_comparison_operator_tokens();
   return 0;
 }

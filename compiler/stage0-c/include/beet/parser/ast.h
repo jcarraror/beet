@@ -25,7 +25,13 @@ typedef enum beet_ast_binary_op {
   BEET_AST_BINARY_ADD = 0,
   BEET_AST_BINARY_SUB,
   BEET_AST_BINARY_MUL,
-  BEET_AST_BINARY_DIV
+  BEET_AST_BINARY_DIV,
+  BEET_AST_BINARY_EQ,
+  BEET_AST_BINARY_NE,
+  BEET_AST_BINARY_LT,
+  BEET_AST_BINARY_LE,
+  BEET_AST_BINARY_GT,
+  BEET_AST_BINARY_GE
 } beet_ast_binary_op;
 
 typedef struct beet_ast_expr {

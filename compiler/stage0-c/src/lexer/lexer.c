@@ -189,6 +189,18 @@ const char *beet_token_kind_name(beet_token_kind kind) {
     return "dot";
   case BEET_TOKEN_EQUAL:
     return "equal";
+  case BEET_TOKEN_EQUAL_EQUAL:
+    return "equal_equal";
+  case BEET_TOKEN_BANG_EQUAL:
+    return "bang_equal";
+  case BEET_TOKEN_LESS:
+    return "less";
+  case BEET_TOKEN_LESS_EQUAL:
+    return "less_equal";
+  case BEET_TOKEN_GREATER:
+    return "greater";
+  case BEET_TOKEN_GREATER_EQUAL:
+    return "greater_equal";
   case BEET_TOKEN_PLUS:
     return "plus";
   case BEET_TOKEN_MINUS:
@@ -254,7 +266,33 @@ beet_token beet_lexer_next(beet_lexer *lexer) {
   case '.':
     return beet_make_token(lexer, BEET_TOKEN_DOT, start, lexer->offset);
   case '=':
+    if (beet_peek(lexer) == '=') {
+      (void)beet_advance(lexer);
+      return beet_make_token(lexer, BEET_TOKEN_EQUAL_EQUAL, start,
+                             lexer->offset);
+    }
     return beet_make_token(lexer, BEET_TOKEN_EQUAL, start, lexer->offset);
+  case '!':
+    if (beet_peek(lexer) == '=') {
+      (void)beet_advance(lexer);
+      return beet_make_token(lexer, BEET_TOKEN_BANG_EQUAL, start,
+                             lexer->offset);
+    }
+    return beet_make_token(lexer, BEET_TOKEN_ERROR, start, lexer->offset);
+  case '<':
+    if (beet_peek(lexer) == '=') {
+      (void)beet_advance(lexer);
+      return beet_make_token(lexer, BEET_TOKEN_LESS_EQUAL, start,
+                             lexer->offset);
+    }
+    return beet_make_token(lexer, BEET_TOKEN_LESS, start, lexer->offset);
+  case '>':
+    if (beet_peek(lexer) == '=') {
+      (void)beet_advance(lexer);
+      return beet_make_token(lexer, BEET_TOKEN_GREATER_EQUAL, start,
+                             lexer->offset);
+    }
+    return beet_make_token(lexer, BEET_TOKEN_GREATER, start, lexer->offset);
   case '+':
     return beet_make_token(lexer, BEET_TOKEN_PLUS, start, lexer->offset);
   case '-':
