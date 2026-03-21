@@ -1,0 +1,11 @@
+function count_to_zero(n is Int) returns Int {
+    if n == 0 {
+        return 0
+    } else {
+        return 1 + count_to_zero(n - 1)
+    }
+}
+
+function main() returns Int {
+    return count_to_zero(3)
+}

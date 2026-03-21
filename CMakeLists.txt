@@ -258,3 +258,24 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "3"
 )
+
+
+add_test(
+    NAME driver_return_called_function
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_called_function.beet
+)
+set_tests_properties(
+    driver_return_called_function
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "42"
+)
+
+add_test(
+    NAME driver_return_recursive_count
+    COMMAND beetc0 ${CMAKE_CURRENT_SOURCE_DIR}/examples/return_recursive_count.beet
+)
+set_tests_properties(
+    driver_return_recursive_count
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "3"
+)

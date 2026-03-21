@@ -1,0 +1,7 @@
+function add1(x is Int) returns Int {
+    return x + 1
+}
+
+function main() returns Int {
+    return add1(41)
+}
