@@ -121,3 +121,26 @@ Added keywords:
 Reason:
 - keep the frontend aligned with Beet’s actual language design
 - avoid prototype syntax drifting away from the spec
+
+## 2026-03-22 — Benchmark JSON Is The Commit-Level Performance Artifact
+
+Frontend performance is tracked by a JSON snapshot written to:
+
+- `docs/benchmarks/latest.json`
+
+When a commit may affect compiler performance, the expected workflow is:
+
+1. save a baseline benchmark JSON
+2. make the change
+3. regenerate `latest.json`
+4. compare baseline vs latest
+
+Reason:
+- keeps performance changes concrete and reviewable
+- avoids relying on vague impressions after hot-path work
+- matches Beet's goal of building a fast self-hosted compiler with explicit,
+  comparable measurements
+
+Tradeoff:
+- slightly slower developer checks
+- benchmark results are still workload-dependent and need interpretation

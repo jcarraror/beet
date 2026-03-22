@@ -130,6 +130,26 @@ run_valgrind_tests() {
     done < "$tmp_files"
 }
 
+run_frontend_benchmark() {
+    if [ "${BEET_SKIP_BENCHMARKS:-0}" = "1" ]; then
+        say "[beet] BEET_SKIP_BENCHMARKS=1; skipping frontend benchmark"
+        return 0
+    fi
+
+    say "[beet] building frontend benchmark"
+    cmake --build build --target bench_frontend
+
+    say "[beet] running frontend benchmark"
+    mkdir -p docs/benchmarks
+    ./build/bench_frontend --json > docs/benchmarks/latest.json
+    say "[beet] wrote benchmark snapshot: docs/benchmarks/latest.json"
+    if have_cmd python3; then
+        python3 ./tools/dev/compare_benchmarks.py docs/benchmarks/latest.json
+    else
+        say "[beet] python3 not found; benchmark summary unavailable"
+    fi
+}
+
 format_tracked_files
 
 if [ "${MODE}" = "--hook" ] && [ "$had_format_changes" -eq 1 ]; then
@@ -143,4 +163,5 @@ fi
 configure_build_test
 run_valgrind_tests
 run_sanitizer_tests
+run_frontend_benchmark
 say "[beet] checks passed"

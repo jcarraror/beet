@@ -36,3 +36,12 @@ Source
 - predictable semantics
 - minimal hidden behavior
 - self-hosting compiler
+
+## Performance Discipline
+
+Stage0 performance is tracked with a frontend benchmark that writes:
+
+- `docs/benchmarks/latest.json`
+
+The benchmark workflow and comparison rules are documented in
+[benchmarking.md](/home/julio/beet/docs/benchmarking.md).

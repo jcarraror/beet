@@ -147,6 +147,11 @@ add_executable(test_vm_execution
 )
 target_link_libraries(test_vm_execution PRIVATE beet_compiler_support)
 
+add_executable(bench_frontend
+    tools/dev/bench_frontend.c
+)
+target_link_libraries(bench_frontend PRIVATE beet_compiler_support)
+
 add_test(NAME smoke_compiler COMMAND test_smoke_compiler)
 add_test(NAME smoke_vm COMMAND test_smoke_vm)
 add_test(NAME diag_print COMMAND test_diag_print)
