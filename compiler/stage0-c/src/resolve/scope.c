@@ -3,11 +3,6 @@
 #include <assert.h>
 #include <string.h>
 
-static int beet_name_equals_slice(const char *left, size_t left_len,
-                                  const char *right, size_t right_len) {
-  return left_len == right_len && strncmp(left, right, left_len) == 0;
-}
-
 void beet_scope_stack_init(beet_scope_stack *stack) {
   assert(stack != NULL);
 
@@ -46,11 +41,17 @@ int beet_scope_bind(beet_scope_stack *stack, const char *name, int is_mutable) {
 
 int beet_scope_bind_slice(beet_scope_stack *stack, const char *name,
                           size_t name_len, int is_mutable) {
+  beet_symbol_id id;
   size_t start;
   size_t i;
 
   assert(stack != NULL);
   assert(name != NULL);
+
+  id = beet_intern_slice(name, name_len);
+  if (id == NULL) {
+    return 0;
+  }
 
   if (stack->symbol_count >= BEET_SCOPE_MAX_SYMBOLS) {
     return 0;
@@ -58,13 +59,13 @@ int beet_scope_bind_slice(beet_scope_stack *stack, const char *name,
 
   start = stack->scope_starts[stack->scope_depth];
   for (i = start; i < stack->symbol_count; ++i) {
-    if (beet_name_equals_slice(stack->symbols[i].name,
-                               stack->symbols[i].name_len, name, name_len)) {
+    if (beet_symbol_eq(stack->symbols[i].id, id)) {
       return 0;
     }
   }
 
-  stack->symbols[stack->symbol_count].name = name;
+  stack->symbols[stack->symbol_count].id = id;
+  stack->symbols[stack->symbol_count].name = id;
   stack->symbols[stack->symbol_count].name_len = name_len;
   stack->symbols[stack->symbol_count].depth = stack->scope_depth;
   stack->symbols[stack->symbol_count].is_mutable = is_mutable;
@@ -79,16 +80,21 @@ const beet_symbol *beet_scope_lookup(const beet_scope_stack *stack,
 
 const beet_symbol *beet_scope_lookup_slice(const beet_scope_stack *stack,
                                            const char *name, size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(stack != NULL);
   assert(name != NULL);
 
+  id = beet_intern_slice(name, name_len);
+  if (id == NULL) {
+    return NULL;
+  }
+
   i = stack->symbol_count;
   while (i > 0U) {
     i -= 1U;
-    if (beet_name_equals_slice(stack->symbols[i].name,
-                               stack->symbols[i].name_len, name, name_len)) {
+    if (beet_symbol_eq(stack->symbols[i].id, id)) {
       return &stack->symbols[i];
     }
   }

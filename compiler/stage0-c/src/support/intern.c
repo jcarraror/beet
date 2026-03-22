@@ -28,7 +28,7 @@ static void beet_intern_cleanup(void) {
   beet_intern_entries = NULL;
 }
 
-const char *beet_intern_slice(const char *text, size_t len) {
+beet_symbol_id beet_intern_slice(const char *text, size_t len) {
   beet_intern_entry *entry;
   char *copy;
 
@@ -66,12 +66,19 @@ const char *beet_intern_slice(const char *text, size_t len) {
   return entry->text;
 }
 
+int beet_symbol_eq(beet_symbol_id left, beet_symbol_id right) {
+  assert(left != NULL);
+  assert(right != NULL);
+
+  return left == right;
+}
+
 int beet_interned_slice_equals(const char *left, size_t left_len,
                                const char *right, size_t right_len) {
   assert(left != NULL);
   assert(right != NULL);
 
-  if (left == right) {
+  if (beet_symbol_eq(left, right)) {
     return left_len == right_len;
   }
 

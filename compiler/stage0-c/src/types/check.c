@@ -5,7 +5,10 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "beet/support/intern.h"
+
 typedef struct beet_local_type {
+  beet_symbol_id id;
   const char *name;
   size_t name_len;
   beet_type type;
@@ -16,22 +19,27 @@ typedef struct beet_local_type {
 
 static int beet_name_equals_slice(const char *left, size_t left_len,
                                   const char *right, size_t right_len) {
-  return left_len == right_len && strncmp(left, right, left_len) == 0;
+  return beet_interned_slice_equals(left, left_len, right, right_len);
 }
 
 static const beet_local_type *
 beet_find_local_type(const beet_local_type *locals, size_t local_count,
                      const char *name, size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(locals != NULL || local_count == 0U);
   assert(name != NULL);
 
+  id = beet_intern_slice(name, name_len);
+  if (id == NULL) {
+    return NULL;
+  }
+
   i = local_count;
   while (i > 0U) {
     i -= 1U;
-    if (beet_name_equals_slice(locals[i].name, locals[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(locals[i].id, id)) {
       return &locals[i];
     }
   }
@@ -66,8 +74,7 @@ static int beet_type_equals(const beet_type *left, const beet_type *right) {
     return 1;
   }
 
-  return beet_name_equals_slice(left->name, left->name_len, right->name,
-                                right->name_len);
+  return beet_symbol_eq(left->name, right->name);
 }
 
 static const beet_ast_type_decl *
@@ -542,6 +549,7 @@ static int beet_type_check_stmt_list(
       }
 
       locals[*local_count].name = stmt->binding.name;
+      locals[*local_count].id = stmt->binding.name;
       locals[*local_count].name_len = stmt->binding.name_len;
       locals[*local_count].type = binding_type;
       locals[*local_count].is_mutable = stmt->binding.is_mutable;
@@ -699,6 +707,7 @@ static int beet_type_check_stmt_list(
           }
 
           case_locals[case_local_count].name = match_case->binding_name;
+          case_locals[case_local_count].id = match_case->binding_name;
           case_locals[case_local_count].name_len = match_case->binding_name_len;
           case_locals[case_local_count].type = payload_type;
           case_locals[case_local_count].is_mutable = 0;
@@ -805,6 +814,7 @@ int beet_type_check_function_body_with_decls(
     }
 
     locals[local_count].name = function_ast->params[i].name;
+    locals[local_count].id = function_ast->params[i].name;
     locals[local_count].name_len = function_ast->params[i].name_len;
     locals[local_count].type = param_type;
     locals[local_count].is_mutable = 0;

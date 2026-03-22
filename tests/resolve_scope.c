@@ -3,6 +3,7 @@
 
 #include "beet/parser/parser.h"
 #include "beet/resolve/scope.h"
+#include "beet/support/intern.h"
 #include "beet/support/source.h"
 
 static void test_bind_and_lookup(void) {
@@ -65,6 +66,21 @@ static void test_lookup_missing(void) {
   beet_scope_stack_init(&stack);
 
   assert(beet_scope_lookup(&stack, "missing") == NULL);
+}
+
+static void test_scope_uses_interned_symbol_identity(void) {
+  beet_scope_stack stack;
+  char dynamic_name[] = {'t', 'o', 't', 'a', 'l', '\0'};
+  const beet_symbol *symbol;
+
+  beet_scope_stack_init(&stack);
+
+  assert(beet_scope_bind_slice(&stack, dynamic_name, 5U, 1));
+  symbol = beet_scope_lookup(&stack, "total");
+  assert(symbol != NULL);
+  assert(symbol->id == beet_intern_slice("total", 5U));
+  assert(symbol->name == symbol->id);
+  assert(symbol->is_mutable == 1);
 }
 
 static void test_resolve_return_local_name(void) {
@@ -462,6 +478,7 @@ int main(void) {
   test_reject_duplicate_in_same_scope();
   test_shadow_in_nested_scope();
   test_lookup_missing();
+  test_scope_uses_interned_symbol_identity();
   test_resolve_return_local_name();
   test_resolve_return_param_name();
   test_resolve_assignment_target_local();

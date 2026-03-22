@@ -5,11 +5,13 @@
 
 #include "beet/parser/ast.h"
 #include "beet/semantics/registry.h"
+#include "beet/support/intern.h"
 
 #define BEET_SCOPE_MAX_SYMBOLS 256
 #define BEET_SCOPE_MAX_STACK 32
 
 typedef struct beet_symbol {
+  beet_symbol_id id;
   const char *name;
   size_t name_len;
   size_t depth;

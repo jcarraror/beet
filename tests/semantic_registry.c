@@ -5,6 +5,7 @@
 #include "beet/parser/parser.h"
 #include "beet/resolve/scope.h"
 #include "beet/semantics/registry.h"
+#include "beet/support/intern.h"
 #include "beet/support/source.h"
 #include "beet/types/check.h"
 
@@ -54,20 +55,32 @@ static void test_registry_shared_across_frontend_layers(void) {
 
   lookup_type = beet_decl_registry_find_type(&registry, "MaybeInt", 8U);
   assert(lookup_type == &type_decl);
+  assert(beet_decl_registry_find_type_symbol(
+             &registry, beet_intern_slice("MaybeInt", 8U)) == &type_decl);
 
   lookup_function = beet_decl_registry_find_function(&registry, "helper", 6U);
   assert(lookup_function == &functions[0]);
+  assert(beet_decl_registry_find_function_symbol(
+             &registry, beet_intern_slice("main", 4U)) == &functions[1]);
   assert(beet_decl_registry_find_function_index(&registry, "main", 4U,
                                                 &function_index));
   assert(function_index == 1U);
+  assert(beet_decl_registry_find_function_index_symbol(
+      &registry, beet_intern_slice("helper", 6U), &function_index));
+  assert(function_index == 0U);
 
   lookup_variant =
       beet_decl_registry_find_choice_variant(&type_decl, "some", 4U);
   assert(lookup_variant != NULL);
   assert(lookup_variant->has_payload == 1);
+  assert(beet_decl_registry_find_choice_variant_symbol(
+             &type_decl, beet_intern_slice("some", 4U)) == lookup_variant);
   assert(beet_decl_registry_find_choice_variant_index(&type_decl, "none", 4U,
                                                       &variant_index));
   assert(variant_index == 0U);
+  assert(beet_decl_registry_find_choice_variant_index_symbol(
+      &type_decl, beet_intern_slice("some", 4U), &variant_index));
+  assert(variant_index == 1U);
 
   assert(beet_type_check_type_decls_with_registry(&registry));
   assert(beet_type_check_function_signature_with_registry(&functions[0],

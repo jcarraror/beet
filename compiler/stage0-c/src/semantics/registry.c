@@ -4,11 +4,6 @@
 
 #include "beet/support/intern.h"
 
-static int beet_name_equals_slice(const char *left, size_t left_len,
-                                  const char *right, size_t right_len) {
-  return beet_interned_slice_equals(left, left_len, right, right_len);
-}
-
 void beet_decl_registry_init(beet_decl_registry *registry,
                              const beet_ast_type_decl *type_decls,
                              size_t type_decl_count,
@@ -27,15 +22,26 @@ void beet_decl_registry_init(beet_decl_registry *registry,
 const beet_ast_type_decl *
 beet_decl_registry_find_type(const beet_decl_registry *registry,
                              const char *name, size_t name_len) {
+  beet_symbol_id symbol;
+
+  symbol = beet_intern_slice(name, name_len);
+  if (symbol == NULL) {
+    return NULL;
+  }
+
+  return beet_decl_registry_find_type_symbol(registry, symbol);
+}
+
+const beet_ast_type_decl *
+beet_decl_registry_find_type_symbol(const beet_decl_registry *registry,
+                                    beet_symbol_id name) {
   size_t i;
 
   assert(registry != NULL);
   assert(name != NULL);
 
   for (i = 0U; i < registry->type_decl_count; ++i) {
-    if (beet_name_equals_slice(registry->type_decls[i].name,
-                               registry->type_decls[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(registry->type_decls[i].name, name)) {
       return &registry->type_decls[i];
     }
   }
@@ -46,15 +52,26 @@ beet_decl_registry_find_type(const beet_decl_registry *registry,
 const beet_ast_function *
 beet_decl_registry_find_function(const beet_decl_registry *registry,
                                  const char *name, size_t name_len) {
+  beet_symbol_id symbol;
+
+  symbol = beet_intern_slice(name, name_len);
+  if (symbol == NULL) {
+    return NULL;
+  }
+
+  return beet_decl_registry_find_function_symbol(registry, symbol);
+}
+
+const beet_ast_function *
+beet_decl_registry_find_function_symbol(const beet_decl_registry *registry,
+                                        beet_symbol_id name) {
   size_t i;
 
   assert(registry != NULL);
   assert(name != NULL);
 
   for (i = 0U; i < registry->function_count; ++i) {
-    if (beet_name_equals_slice(registry->function_decls[i].name,
-                               registry->function_decls[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(registry->function_decls[i].name, name)) {
       return &registry->function_decls[i];
     }
   }
@@ -65,6 +82,20 @@ beet_decl_registry_find_function(const beet_decl_registry *registry,
 int beet_decl_registry_find_function_index(const beet_decl_registry *registry,
                                            const char *name, size_t name_len,
                                            size_t *out_index) {
+  beet_symbol_id symbol;
+
+  symbol = beet_intern_slice(name, name_len);
+  if (symbol == NULL) {
+    return 0;
+  }
+
+  return beet_decl_registry_find_function_index_symbol(registry, symbol,
+                                                       out_index);
+}
+
+int beet_decl_registry_find_function_index_symbol(
+    const beet_decl_registry *registry, beet_symbol_id name,
+    size_t *out_index) {
   size_t i;
 
   assert(registry != NULL);
@@ -72,9 +103,7 @@ int beet_decl_registry_find_function_index(const beet_decl_registry *registry,
   assert(out_index != NULL);
 
   for (i = 0U; i < registry->function_count; ++i) {
-    if (beet_name_equals_slice(registry->function_decls[i].name,
-                               registry->function_decls[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(registry->function_decls[i].name, name)) {
       *out_index = i;
       return 1;
     }
@@ -86,15 +115,25 @@ int beet_decl_registry_find_function_index(const beet_decl_registry *registry,
 const beet_ast_choice_variant *
 beet_decl_registry_find_choice_variant(const beet_ast_type_decl *type_decl,
                                        const char *name, size_t name_len) {
+  beet_symbol_id symbol;
+
+  symbol = beet_intern_slice(name, name_len);
+  if (symbol == NULL) {
+    return NULL;
+  }
+
+  return beet_decl_registry_find_choice_variant_symbol(type_decl, symbol);
+}
+
+const beet_ast_choice_variant *beet_decl_registry_find_choice_variant_symbol(
+    const beet_ast_type_decl *type_decl, beet_symbol_id name) {
   size_t i;
 
   assert(type_decl != NULL);
   assert(name != NULL);
 
   for (i = 0U; i < type_decl->variant_count; ++i) {
-    if (beet_name_equals_slice(type_decl->variants[i].name,
-                               type_decl->variants[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(type_decl->variants[i].name, name)) {
       return &type_decl->variants[i];
     }
   }
@@ -105,6 +144,20 @@ beet_decl_registry_find_choice_variant(const beet_ast_type_decl *type_decl,
 int beet_decl_registry_find_choice_variant_index(
     const beet_ast_type_decl *type_decl, const char *name, size_t name_len,
     size_t *out_index) {
+  beet_symbol_id symbol;
+
+  symbol = beet_intern_slice(name, name_len);
+  if (symbol == NULL) {
+    return 0;
+  }
+
+  return beet_decl_registry_find_choice_variant_index_symbol(type_decl, symbol,
+                                                             out_index);
+}
+
+int beet_decl_registry_find_choice_variant_index_symbol(
+    const beet_ast_type_decl *type_decl, beet_symbol_id name,
+    size_t *out_index) {
   size_t i;
 
   assert(type_decl != NULL);
@@ -112,9 +165,7 @@ int beet_decl_registry_find_choice_variant_index(
   assert(out_index != NULL);
 
   for (i = 0U; i < type_decl->variant_count; ++i) {
-    if (beet_name_equals_slice(type_decl->variants[i].name,
-                               type_decl->variants[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(type_decl->variants[i].name, name)) {
       *out_index = i;
       return 1;
     }
