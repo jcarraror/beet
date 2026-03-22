@@ -32,6 +32,9 @@ typedef enum beet_bc_opcode {
 typedef struct beet_bytecode_function {
   int *code;
   size_t code_count;
+  size_t *jump_target_pcs;
+  size_t jump_target_count;
+  int jump_targets_ready;
   size_t local_count;
   size_t param_count;
 } beet_bytecode_function;
@@ -43,6 +46,7 @@ typedef struct beet_bytecode_program {
 
 void beet_bytecode_function_init(beet_bytecode_function *function);
 void beet_bytecode_program_init(beet_bytecode_program *program);
+int beet_bytecode_prepare_jump_targets(beet_bytecode_function *function);
 
 int beet_bytecode_emit2(beet_bytecode_function *function, int a, int b);
 int beet_bytecode_emit3(beet_bytecode_function *function, int a, int b, int c);

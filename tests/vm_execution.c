@@ -220,6 +220,39 @@ static void test_jump_to_missing_label_fails(void) {
   assert(!beet_vm_execute(&vm, &fn, &result));
 }
 
+static void test_jump_targets_are_precomputed(void) {
+  beet_bytecode_function fn;
+  beet_vm vm;
+  int result;
+
+  beet_bytecode_function_init(&fn);
+
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_JUMP, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 99));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 7));
+
+  assert(!fn.jump_targets_ready);
+  assert(beet_vm_execute(&vm, &fn, &result));
+  assert(result == 7);
+  assert(fn.jump_targets_ready);
+  assert(fn.jump_target_count == 1U);
+  assert(fn.jump_target_pcs[0] == 6U);
+}
+
+static void test_duplicate_labels_fail_during_jump_target_prepare(void) {
+  beet_bytecode_function fn;
+  beet_vm vm;
+  int result;
+
+  beet_bytecode_function_init(&fn);
+
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_LABEL, 0));
+  assert(beet_bytecode_emit2(&fn, BEET_BC_OP_RETURN_CONST_INT, 7));
+  assert(!beet_vm_execute(&vm, &fn, &result));
+}
+
 static void test_while_false_skips_body(void) {
   beet_bytecode_function fn;
   beet_vm vm;
@@ -553,6 +586,8 @@ int main(void) {
   test_jump_if_false_takes_branch();
   test_jump_if_false_falls_through_on_true();
   test_jump_to_missing_label_fails();
+  test_jump_targets_are_precomputed();
+  test_duplicate_labels_fail_during_jump_target_prepare();
   test_while_false_skips_body();
   test_while_true_returns_from_body();
   test_branch_updates_local_and_returns_it();

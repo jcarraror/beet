@@ -21,9 +21,9 @@ typedef struct beet_vm {
 } beet_vm;
 
 /* returns 1 on success, and sets *out_result */
-int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
+int beet_vm_execute(beet_vm *vm, beet_bytecode_function *function,
                     int *out_result);
-int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
+int beet_vm_execute_program(beet_vm *vm, beet_bytecode_program *program,
                             size_t entry_index, int *out_result);
 
 #endif

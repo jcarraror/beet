@@ -1,83 +1,8 @@
 #include "beet/vm/interpreter.h"
 
 #include <assert.h>
+#include <stdint.h>
 #include <string.h>
-
-static size_t beet_vm_instr_width_at(const beet_bytecode_function *function,
-                                     size_t pc) {
-  int op;
-
-  assert(function != NULL);
-
-  if (pc >= function->code_count) {
-    return 0U;
-  }
-
-  op = function->code[pc];
-
-  switch (op) {
-  case BEET_BC_OP_CONST_INT:
-  case BEET_BC_OP_STORE_LOCAL:
-  case BEET_BC_OP_LOAD_LOCAL:
-  case BEET_BC_OP_JUMP_IF_FALSE:
-    return 3U;
-
-  case BEET_BC_OP_ADD_INT:
-  case BEET_BC_OP_SUB_INT:
-  case BEET_BC_OP_MUL_INT:
-  case BEET_BC_OP_DIV_INT:
-  case BEET_BC_OP_EQ_INT:
-  case BEET_BC_OP_NE_INT:
-  case BEET_BC_OP_LT_INT:
-  case BEET_BC_OP_LE_INT:
-  case BEET_BC_OP_GT_INT:
-  case BEET_BC_OP_GE_INT:
-    return 4U;
-
-  case BEET_BC_OP_RETURN_LOCAL:
-  case BEET_BC_OP_RETURN_TEMP:
-  case BEET_BC_OP_RETURN_CONST_INT:
-  case BEET_BC_OP_LABEL:
-  case BEET_BC_OP_JUMP:
-    return 2U;
-
-  case BEET_BC_OP_CALL:
-    if (pc + 4U > function->code_count) {
-      return 0U;
-    }
-    return 4U + (size_t)function->code[pc + 3U];
-
-  default:
-    return 0U;
-  }
-}
-
-static int beet_vm_find_label_pc(const beet_bytecode_function *function,
-                                 int label_id, size_t *out_pc) {
-  size_t pc;
-
-  assert(function != NULL);
-  assert(out_pc != NULL);
-
-  pc = 0U;
-  while (pc < function->code_count) {
-    size_t width = beet_vm_instr_width_at(function, pc);
-
-    if (width == 0U || pc + width > function->code_count) {
-      return 0;
-    }
-
-    if (function->code[pc] == BEET_BC_OP_LABEL &&
-        function->code[pc + 1U] == label_id) {
-      *out_pc = pc + width;
-      return 1;
-    }
-
-    pc += width;
-  }
-
-  return 0;
-}
 
 static beet_vm_frame *beet_vm_current_frame(beet_vm *vm) {
   assert(vm != NULL);
@@ -86,9 +11,8 @@ static beet_vm_frame *beet_vm_current_frame(beet_vm *vm) {
   return &vm->frames[vm->frame_count - 1U];
 }
 
-static const beet_bytecode_function *
-beet_vm_current_function(const beet_vm *vm,
-                         const beet_bytecode_program *program) {
+static beet_bytecode_function *
+beet_vm_current_function(const beet_vm *vm, beet_bytecode_program *program) {
   const beet_vm_frame *frame;
 
   assert(vm != NULL);
@@ -122,14 +46,22 @@ static int beet_vm_push_frame(beet_vm *vm, size_t function_index,
   return 1;
 }
 
-int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
+int beet_vm_execute_program(beet_vm *vm, beet_bytecode_program *program,
                             size_t entry_index, int *out_result) {
+  size_t i;
+
   assert(vm != NULL);
   assert(program != NULL);
   assert(out_result != NULL);
 
   if (entry_index >= program->function_count) {
     return 0;
+  }
+
+  for (i = 0U; i < program->function_count; ++i) {
+    if (!beet_bytecode_prepare_jump_targets(&program->functions[i])) {
+      return 0;
+    }
   }
 
   vm->frame_count = 0U;
@@ -139,8 +71,7 @@ int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
 
   while (vm->frame_count > 0U) {
     beet_vm_frame *frame = beet_vm_current_frame(vm);
-    const beet_bytecode_function *function =
-        beet_vm_current_function(vm, program);
+    beet_bytecode_function *function = beet_vm_current_function(vm, program);
 
     if (function == NULL || frame->pc >= function->code_count) {
       return 0;
@@ -176,7 +107,7 @@ int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
       int dst = function->code[frame->pc + 1U];
       int callee_index = function->code[frame->pc + 2U];
       size_t arg_count = (size_t)function->code[frame->pc + 3U];
-      size_t i;
+      size_t arg_index;
       beet_vm_frame *callee_frame;
 
       if (callee_index < 0 || (size_t)callee_index >= program->function_count) {
@@ -194,9 +125,9 @@ int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
       }
 
       callee_frame = beet_vm_current_frame(vm);
-      for (i = 0U; i < arg_count; ++i) {
-        int arg_temp = function->code[frame->pc - arg_count + i];
-        callee_frame->locals[i] = frame->regs[arg_temp];
+      for (arg_index = 0U; arg_index < arg_count; ++arg_index) {
+        int arg_temp = function->code[frame->pc - arg_count + arg_index];
+        callee_frame->locals[arg_index] = frame->regs[arg_temp];
       }
       break;
     }
@@ -300,9 +231,11 @@ int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
 
     case BEET_BC_OP_JUMP: {
       int label_id = function->code[frame->pc + 1U];
-      if (!beet_vm_find_label_pc(function, label_id, &frame->pc)) {
+      if (label_id < 0 || (size_t)label_id >= function->jump_target_count ||
+          function->jump_target_pcs[label_id] == SIZE_MAX) {
         return 0;
       }
+      frame->pc = function->jump_target_pcs[label_id];
       break;
     }
 
@@ -310,9 +243,11 @@ int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
       int condition_temp = function->code[frame->pc + 1U];
       int label_id = function->code[frame->pc + 2U];
       if (frame->regs[condition_temp] == 0) {
-        if (!beet_vm_find_label_pc(function, label_id, &frame->pc)) {
+        if (label_id < 0 || (size_t)label_id >= function->jump_target_count ||
+            function->jump_target_pcs[label_id] == SIZE_MAX) {
           return 0;
         }
+        frame->pc = function->jump_target_pcs[label_id];
       } else {
         frame->pc += 3U;
       }
@@ -354,7 +289,7 @@ int beet_vm_execute_program(beet_vm *vm, const beet_bytecode_program *program,
   return 0;
 }
 
-int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
+int beet_vm_execute(beet_vm *vm, beet_bytecode_function *function,
                     int *out_result) {
   beet_bytecode_program program;
 
@@ -362,8 +297,7 @@ int beet_vm_execute(beet_vm *vm, const beet_bytecode_function *function,
   assert(function != NULL);
   assert(out_result != NULL);
 
-  beet_bytecode_program_init(&program);
-  program.functions[0] = *function;
+  program.functions = function;
   program.function_count = 1U;
   return beet_vm_execute_program(vm, &program, 0U, out_result);
 }
