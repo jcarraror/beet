@@ -120,6 +120,10 @@ static void beet_ast_expr_init(beet_ast_expr *expr) {
   expr->resolved_is_mutable = 0;
   expr->call_is_resolved = 0;
   expr->call_target_index = 0U;
+  expr->resolved_type_decl = NULL;
+  expr->resolved_field_decl = NULL;
+  expr->resolved_variant_decl = NULL;
+  expr->resolved_variant_index = 0U;
   expr->unary_op = BEET_AST_UNARY_NEGATE;
   expr->binary_op = BEET_AST_BINARY_ADD;
   expr->left = NULL;
@@ -142,6 +146,7 @@ static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
   stmt->binding.has_type = 0;
   stmt->binding.type_name = NULL;
   stmt->binding.type_name_len = 0U;
+  stmt->binding.resolved_type_decl = NULL;
   stmt->binding.value_text = NULL;
   stmt->binding.value_len = 0U;
   beet_ast_expr_init(&stmt->binding.expr);
@@ -160,6 +165,8 @@ static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
     stmt->match_cases[i].variant_name_len = 0U;
     stmt->match_cases[i].span = beet_parser_zero_span();
     stmt->match_cases[i].binds_payload = 0;
+    stmt->match_cases[i].resolved_variant_decl = NULL;
+    stmt->match_cases[i].resolved_variant_index = 0U;
     stmt->match_cases[i].binding_name = NULL;
     stmt->match_cases[i].binding_name_len = 0U;
     stmt->match_cases[i].body = NULL;
@@ -792,6 +799,7 @@ static int beet_parser_parse_binding_with_pool(beet_parser *parser,
   out->has_type = 0;
   out->type_name = NULL;
   out->type_name_len = 0U;
+  out->resolved_type_decl = NULL;
   out->value_text = NULL;
   out->value_len = 0U;
   beet_ast_expr_init(&out->expr);

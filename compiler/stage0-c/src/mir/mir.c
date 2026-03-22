@@ -54,6 +54,7 @@ typedef struct beet_mir_local_type {
   size_t name_len;
   const char *type_name;
   size_t type_name_len;
+  const beet_ast_type_decl *type_decl;
 } beet_mir_local_type;
 
 typedef struct beet_mir_lower_context {
@@ -74,20 +75,18 @@ beet_mir_find_type_decl(const beet_ast_type_decl *type_decls, size_t decl_count,
 }
 
 static int
-beet_mir_find_choice_variant_index(const beet_ast_type_decl *type_decl,
-                                   const char *name, size_t name_len,
-                                   size_t *out_index) {
-  return beet_decl_registry_find_choice_variant_index(type_decl, name, name_len,
-                                                      out_index);
-}
-
-static int beet_mir_context_bind_local_type(beet_mir_lower_context *ctx,
-                                            const char *name, size_t name_len,
-                                            const char *type_name,
-                                            size_t type_name_len) {
+beet_mir_context_bind_local_type(beet_mir_lower_context *ctx, const char *name,
+                                 size_t name_len, const char *type_name,
+                                 size_t type_name_len,
+                                 const beet_ast_type_decl *type_decl) {
   assert(ctx != NULL);
   assert(name != NULL);
   assert(type_name != NULL);
+
+  if (type_decl == NULL) {
+    type_decl = beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
+                                        type_name, type_name_len);
+  }
 
   if (ctx->local_count >= BEET_MIR_MAX_LOCALS) {
     return 0;
@@ -97,6 +96,7 @@ static int beet_mir_context_bind_local_type(beet_mir_lower_context *ctx,
   ctx->locals[ctx->local_count].name_len = name_len;
   ctx->locals[ctx->local_count].type_name = type_name;
   ctx->locals[ctx->local_count].type_name_len = type_name_len;
+  ctx->locals[ctx->local_count].type_decl = type_decl;
   ctx->local_count += 1U;
   return 1;
 }
@@ -642,20 +642,21 @@ static int beet_mir_build_choice_variant_storage_name(char *name,
                                    variant_name_len);
 }
 
-static int beet_mir_reserve_typed_local_storage(beet_mir_lower_context *ctx,
-                                                const char *name,
-                                                size_t name_len,
-                                                const char *type_name,
-                                                size_t type_name_len) {
-  const beet_ast_type_decl *type_decl;
+static int beet_mir_reserve_typed_local_storage(
+    beet_mir_lower_context *ctx, const char *name, size_t name_len,
+    const char *type_name, size_t type_name_len,
+    const beet_ast_type_decl *type_decl) {
   size_t i;
 
   assert(ctx != NULL);
   assert(name != NULL);
   assert(type_name != NULL);
 
-  type_decl = beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
-                                      type_name, type_name_len);
+  if (type_decl == NULL && type_name != NULL) {
+    type_decl = beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
+                                        type_name, type_name_len);
+  }
+
   if (type_decl == NULL) {
     return beet_mir_reserve_local(ctx->function, name, name_len);
   }
@@ -680,7 +681,7 @@ static int beet_mir_reserve_typed_local_storage(beet_mir_lower_context *ctx,
           !beet_mir_reserve_typed_local_storage(
               ctx, field_name, strlen(field_name),
               type_decl->variants[i].payload_type_name,
-              type_decl->variants[i].payload_type_name_len)) {
+              type_decl->variants[i].payload_type_name_len, NULL)) {
         return 0;
       }
     }
@@ -696,7 +697,7 @@ static int beet_mir_reserve_typed_local_storage(beet_mir_lower_context *ctx,
                                    type_decl->fields[i].name_len) ||
         !beet_mir_reserve_typed_local_storage(
             ctx, field_name, strlen(field_name), type_decl->fields[i].type_name,
-            type_decl->fields[i].type_name_len)) {
+            type_decl->fields[i].type_name_len, NULL)) {
       return 0;
     }
   }
@@ -708,8 +709,8 @@ static int beet_mir_copy_local_value(beet_mir_lower_context *ctx,
                                      const char *dst_name, size_t dst_name_len,
                                      const char *src_name, size_t src_name_len,
                                      const char *type_name,
-                                     size_t type_name_len) {
-  const beet_ast_type_decl *type_decl;
+                                     size_t type_name_len,
+                                     const beet_ast_type_decl *type_decl) {
   char dst_field_name[BEET_MIR_MAX_NAME_LEN];
   char src_field_name[BEET_MIR_MAX_NAME_LEN];
   int temp;
@@ -720,8 +721,11 @@ static int beet_mir_copy_local_value(beet_mir_lower_context *ctx,
   assert(src_name != NULL);
   assert(type_name != NULL);
 
-  type_decl = beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
-                                      type_name, type_name_len);
+  if (type_decl == NULL && type_name != NULL) {
+    type_decl = beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
+                                        type_name, type_name_len);
+  }
+
   if (type_decl == NULL) {
     temp = beet_mir_add_load_local(ctx->function, src_name, src_name_len);
     if (temp < 0) {
@@ -745,7 +749,7 @@ static int beet_mir_copy_local_value(beet_mir_lower_context *ctx,
       if (!beet_mir_copy_local_value(
               ctx, dst_field_name, strlen(dst_field_name), src_field_name,
               strlen(src_field_name), type_decl->fields[i].type_name,
-              type_decl->fields[i].type_name_len)) {
+              type_decl->fields[i].type_name_len, NULL)) {
         return 0;
       }
     }
@@ -785,7 +789,7 @@ static int beet_mir_copy_local_value(beet_mir_lower_context *ctx,
       if (!beet_mir_copy_local_value(
               ctx, dst_field_name, strlen(dst_field_name), src_field_name,
               strlen(src_field_name), type_decl->variants[i].payload_type_name,
-              type_decl->variants[i].payload_type_name_len)) {
+              type_decl->variants[i].payload_type_name_len, NULL)) {
         return 0;
       }
     }
@@ -809,21 +813,18 @@ static int beet_mir_lower_expr_into_local(beet_mir_lower_context *ctx,
   assert(expr != NULL);
 
   if (expr->kind == BEET_AST_EXPR_CONSTRUCT) {
-    type_decl = beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
-                                        expr->text, expr->text_len);
+    type_decl = expr->resolved_type_decl;
     if (type_decl != NULL &&
         !beet_mir_reserve_typed_local_storage(ctx, name, name_len, expr->text,
-                                              expr->text_len)) {
+                                              expr->text_len, type_decl)) {
       return 0;
     }
 
     if (type_decl != NULL && type_decl->is_choice) {
-      if (expr->field_init_count != 1U ||
-          !beet_mir_find_choice_variant_index(
-              type_decl, expr->field_inits[0].name,
-              expr->field_inits[0].name_len, &variant_index)) {
+      if (expr->field_init_count != 1U || expr->resolved_variant_decl == NULL) {
         return 0;
       }
+      variant_index = expr->resolved_variant_index;
 
       if (!beet_mir_build_choice_tag_name(field_name, name, name_len)) {
         return 0;
@@ -891,16 +892,19 @@ static int beet_mir_register_binding_type(beet_mir_lower_context *ctx,
                                           const beet_ast_binding *binding) {
   const char *type_name;
   size_t type_name_len;
+  const beet_ast_type_decl *type_decl;
 
   assert(ctx != NULL);
   assert(binding != NULL);
 
+  type_decl = binding->resolved_type_decl;
   if (binding->has_type) {
     type_name = binding->type_name;
     type_name_len = binding->type_name_len;
-  } else if (binding->expr.kind == BEET_AST_EXPR_CONSTRUCT) {
-    type_name = binding->expr.text;
-    type_name_len = binding->expr.text_len;
+  } else if (binding->expr.resolved_type_decl != NULL) {
+    type_name = binding->expr.resolved_type_decl->name;
+    type_name_len = binding->expr.resolved_type_decl->name_len;
+    type_decl = binding->expr.resolved_type_decl;
   } else if (binding->expr.kind == BEET_AST_EXPR_INT_LITERAL) {
     type_name = "Int";
     type_name_len = 3U;
@@ -912,7 +916,7 @@ static int beet_mir_register_binding_type(beet_mir_lower_context *ctx,
   }
 
   return beet_mir_context_bind_local_type(ctx, binding->name, binding->name_len,
-                                          type_name, type_name_len);
+                                          type_name, type_name_len, type_decl);
 }
 
 static int
@@ -938,7 +942,8 @@ beet_mir_register_param_locals(beet_mir_lower_context *ctx,
     if (!beet_mir_context_bind_local_type(
             ctx, function_ast->params[i].name, function_ast->params[i].name_len,
             function_ast->params[i].type_name,
-            function_ast->params[i].type_name_len)) {
+            function_ast->params[i].type_name_len,
+            function_ast->params[i].resolved_type_decl)) {
       return 0;
     }
   }
@@ -1131,8 +1136,7 @@ static int beet_mir_get_match_scrutinee(beet_mir_lower_context *ctx,
   memset(out, 0, sizeof(*out));
 
   if (expr->kind == BEET_AST_EXPR_CONSTRUCT) {
-    out->type_decl = beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
-                                             expr->text, expr->text_len);
+    out->type_decl = expr->resolved_type_decl;
     if (out->type_decl == NULL || !out->type_decl->is_choice) {
       return 0;
     }
@@ -1151,9 +1155,7 @@ static int beet_mir_get_match_scrutinee(beet_mir_lower_context *ctx,
     return 0;
   }
 
-  out->type_decl =
-      beet_mir_find_type_decl(ctx->type_decls, ctx->decl_count,
-                              local_type->type_name, local_type->type_name_len);
+  out->type_decl = local_type->type_decl;
   if (out->type_decl == NULL || !out->type_decl->is_choice) {
     return 0;
   }
@@ -1220,15 +1222,11 @@ static int beet_mir_lower_match_stmt(beet_mir_lower_context *ctx,
   }
 
   if (scrutinee.is_construct) {
-    size_t variant_index;
-
-    if (!beet_mir_find_choice_variant_index(
-            scrutinee.type_decl, scrutinee.construct_expr->field_inits[0].name,
-            scrutinee.construct_expr->field_inits[0].name_len,
-            &variant_index)) {
+    if (scrutinee.construct_expr->resolved_variant_decl == NULL) {
       return 0;
     }
-    tag_temp = beet_mir_add_const_int(ctx->function, (int)variant_index);
+    tag_temp = beet_mir_add_const_int(
+        ctx->function, (int)scrutinee.construct_expr->resolved_variant_index);
   } else {
     char tag_name[BEET_MIR_MAX_NAME_LEN];
 
@@ -1255,13 +1253,11 @@ static int beet_mir_lower_match_stmt(beet_mir_lower_context *ctx,
     int case_tag_temp;
     int condition_temp;
 
-    variant_decl = NULL;
-    if (!beet_mir_find_choice_variant_index(
-            scrutinee.type_decl, match_case->variant_name,
-            match_case->variant_name_len, &variant_index)) {
+    variant_decl = match_case->resolved_variant_decl;
+    variant_index = match_case->resolved_variant_index;
+    if (variant_decl == NULL) {
       return 0;
     }
-    variant_decl = &scrutinee.type_decl->variants[variant_index];
 
     case_tag_temp = beet_mir_add_const_int(ctx->function, (int)variant_index);
     if (case_tag_temp < 0) {
@@ -1301,11 +1297,11 @@ static int beet_mir_lower_match_stmt(beet_mir_lower_context *ctx,
                 match_case->variant_name, match_case->variant_name_len)) {
           return 0;
         }
-        if (!beet_mir_copy_local_value(ctx, match_case->binding_name,
-                                       match_case->binding_name_len,
-                                       payload_name, strlen(payload_name),
-                                       variant_decl->payload_type_name,
-                                       variant_decl->payload_type_name_len)) {
+        if (!beet_mir_copy_local_value(
+                ctx, match_case->binding_name, match_case->binding_name_len,
+                payload_name, strlen(payload_name),
+                variant_decl->payload_type_name,
+                variant_decl->payload_type_name_len, NULL)) {
           return 0;
         }
       }
@@ -1313,7 +1309,7 @@ static int beet_mir_lower_match_stmt(beet_mir_lower_context *ctx,
       if (!beet_mir_context_bind_local_type(
               ctx, match_case->binding_name, match_case->binding_name_len,
               variant_decl->payload_type_name,
-              variant_decl->payload_type_name_len)) {
+              variant_decl->payload_type_name_len, NULL)) {
         return 0;
       }
     }

@@ -754,6 +754,64 @@ static void test_function_body_structure_binding_and_field_access_ok(void) {
   beet_source_file_dispose(&decl_file);
 }
 
+static void test_function_body_preserves_named_semantic_facts(void) {
+  const char *text =
+      "type Point = structure {\n"
+      "    x is Int\n"
+      "    y is Int\n"
+      "}\n"
+      "type MaybeInt = choice {\n"
+      "    none\n"
+      "    some(Int)\n"
+      "}\n"
+      "function main(point is Point, value is MaybeInt) returns Int {\n"
+      "    bind next is Point = Point(x = 3, y = 4)\n"
+      "    match value {\n"
+      "        case none {\n"
+      "            return point.x\n"
+      "        }\n"
+      "        case some(item) {\n"
+      "            return item\n"
+      "        }\n"
+      "    }\n"
+      "    return next.x\n"
+      "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_type_decl decls[2];
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_type_decl(&parser, &decls[0]));
+  assert(beet_parser_parse_type_decl(&parser, &decls[1]));
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(beet_type_check_type_decls(decls, 2U));
+  assert(beet_type_check_function_signature_with_type_decls(&function_ast,
+                                                            decls, 2U));
+  assert(
+      beet_type_check_function_body_with_type_decls(&function_ast, decls, 2U));
+
+  assert(function_ast.params[0].resolved_type_decl == &decls[0]);
+  assert(function_ast.params[1].resolved_type_decl == &decls[1]);
+  assert(function_ast.body[0].binding.resolved_type_decl == &decls[0]);
+  assert(function_ast.body[0].binding.expr.resolved_type_decl == &decls[0]);
+  assert(function_ast.body[1].match_expr.resolved_type_decl == &decls[1]);
+  assert(function_ast.body[1].match_cases[0].resolved_variant_decl ==
+         &decls[1].variants[0]);
+  assert(function_ast.body[1].match_cases[0].resolved_variant_index == 0U);
+  assert(function_ast.body[1].match_cases[1].resolved_variant_decl ==
+         &decls[1].variants[1]);
+  assert(function_ast.body[1].match_cases[1].resolved_variant_index == 1U);
+  assert(function_ast.body[1].match_cases[0].body[0].expr.resolved_field_decl ==
+         &decls[0].fields[0]);
+
+  beet_source_file_dispose(&file);
+}
+
 static void test_function_call_body_ok(void) {
   const char *text = "function add(x is Int, y is Int) returns Int {\n"
                      "    return x + y\n"
@@ -1252,6 +1310,7 @@ int main(void) {
   test_function_body_structure_construction_rejects_field_type_mismatch();
   test_function_body_field_access_rejects_unknown_field();
   test_function_body_structure_binding_and_field_access_ok();
+  test_function_body_preserves_named_semantic_facts();
   test_function_body_choice_construction_with_payload_ok();
   test_function_body_choice_construction_without_payload_ok();
   test_function_body_choice_construction_rejects_payload_type_mismatch();

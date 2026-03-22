@@ -40,6 +40,9 @@ typedef enum beet_ast_binary_op {
 } beet_ast_binary_op;
 
 struct beet_ast_expr;
+struct beet_ast_type_decl;
+struct beet_ast_field;
+struct beet_ast_choice_variant;
 
 typedef struct beet_ast_field_init {
   const char *name;
@@ -58,6 +61,10 @@ typedef struct beet_ast_expr {
   int resolved_is_mutable;
   int call_is_resolved;
   size_t call_target_index;
+  const struct beet_ast_type_decl *resolved_type_decl;
+  const struct beet_ast_field *resolved_field_decl;
+  const struct beet_ast_choice_variant *resolved_variant_decl;
+  size_t resolved_variant_index;
 
   beet_ast_unary_op unary_op;
   beet_ast_binary_op binary_op;
@@ -81,6 +88,7 @@ typedef struct beet_ast_binding {
 
   const char *type_name;
   size_t type_name_len;
+  const struct beet_ast_type_decl *resolved_type_decl;
 
   const char *value_text;
   size_t value_len;
@@ -114,6 +122,8 @@ typedef struct beet_ast_match_case {
   beet_source_span span;
 
   int binds_payload;
+  const struct beet_ast_choice_variant *resolved_variant_decl;
+  size_t resolved_variant_index;
   const char *binding_name;
   size_t binding_name_len;
 
@@ -146,6 +156,7 @@ typedef struct beet_ast_param {
 
   const char *type_name;
   size_t type_name_len;
+  const struct beet_ast_type_decl *resolved_type_decl;
 } beet_ast_param;
 
 typedef struct beet_ast_function {
