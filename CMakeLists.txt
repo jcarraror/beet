@@ -33,6 +33,7 @@ if(BEET_ENABLE_SANITIZERS)
 endif()
 
 add_library(beet_compiler_support
+    compiler/stage0-c/src/support/intern.c
     compiler/stage0-c/src/support/source.c
     compiler/stage0-c/src/diag/diag.c
     compiler/stage0-c/src/lexer/lexer.c

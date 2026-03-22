@@ -3,15 +3,11 @@
 #include <assert.h>
 #include <string.h>
 
+#include "beet/support/intern.h"
+
 static int beet_name_equals(const char *name, size_t len,
                             const char *expected) {
-  size_t expected_len;
-
-  assert(name != NULL);
-  assert(expected != NULL);
-
-  expected_len = strlen(expected);
-  return expected_len == len && strncmp(name, expected, len) == 0;
+  return beet_interned_slice_equals(name, len, expected, strlen(expected));
 }
 
 beet_type beet_type_from_name_slice(const char *name, size_t len) {

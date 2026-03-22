@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "beet/support/intern.h"
+
 typedef struct beet_ast_expr_pool {
   beet_ast_expr *expr_nodes;
   size_t *expr_count;
@@ -136,7 +138,10 @@ static int beet_parser_parse_param(beet_parser *parser, beet_ast_param *out) {
   }
 
   name_token = parser->current;
-  out->name = name_token.lexeme;
+  out->name = beet_intern_slice(name_token.lexeme, name_token.lexeme_len);
+  if (out->name == NULL) {
+    return 0;
+  }
   out->name_len = name_token.lexeme_len;
   beet_parser_advance(parser);
 
@@ -149,7 +154,10 @@ static int beet_parser_parse_param(beet_parser *parser, beet_ast_param *out) {
   }
 
   type_token = parser->current;
-  out->type_name = type_token.lexeme;
+  out->type_name = beet_intern_slice(type_token.lexeme, type_token.lexeme_len);
+  if (out->type_name == NULL) {
+    return 0;
+  }
   out->type_name_len = type_token.lexeme_len;
   out->span = beet_parser_span_from_bounds(name_token.span, type_token.span);
   beet_parser_advance(parser);
@@ -323,7 +331,10 @@ static int beet_parser_parse_call_expr(beet_parser *parser,
 
   beet_ast_expr_init(out);
   out->kind = BEET_AST_EXPR_CALL;
-  out->text = callee_token->lexeme;
+  out->text = beet_intern_slice(callee_token->lexeme, callee_token->lexeme_len);
+  if (out->text == NULL) {
+    return 0;
+  }
   out->text_len = callee_token->lexeme_len;
   out->span = callee_token->span;
 
@@ -385,7 +396,11 @@ static int beet_parser_parse_choice_construct_expr(
   out->text_len = type_name_len;
   out->span = beet_parser_span_from_bounds(type_span, variant_token->span);
   out->field_init_count = 1U;
-  out->field_inits[0].name = variant_token->lexeme;
+  out->field_inits[0].name =
+      beet_intern_slice(variant_token->lexeme, variant_token->lexeme_len);
+  if (out->field_inits[0].name == NULL) {
+    return 0;
+  }
   out->field_inits[0].name_len = variant_token->lexeme_len;
   out->field_inits[0].value = NULL;
 
@@ -432,7 +447,10 @@ static int beet_parser_parse_construct_expr(beet_parser *parser,
 
   beet_ast_expr_init(out);
   out->kind = BEET_AST_EXPR_CONSTRUCT;
-  out->text = type_token->lexeme;
+  out->text = beet_intern_slice(type_token->lexeme, type_token->lexeme_len);
+  if (out->text == NULL) {
+    return 0;
+  }
   out->text_len = type_token->lexeme_len;
   out->span = type_token->span;
 
@@ -451,7 +469,11 @@ static int beet_parser_parse_construct_expr(beet_parser *parser,
       return 0;
     }
 
-    out->field_inits[out->field_init_count].name = parser->current.lexeme;
+    out->field_inits[out->field_init_count].name =
+        beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+    if (out->field_inits[out->field_init_count].name == NULL) {
+      return 0;
+    }
     out->field_inits[out->field_init_count].name_len =
         parser->current.lexeme_len;
     beet_parser_advance(parser);
@@ -527,7 +549,11 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
       return beet_parser_parse_call_expr(parser, pool, &identifier_token, out);
     }
 
-    out->text = identifier_token.lexeme;
+    out->text =
+        beet_intern_slice(identifier_token.lexeme, identifier_token.lexeme_len);
+    if (out->text == NULL) {
+      return 0;
+    }
     out->text_len = identifier_token.lexeme_len;
     out->span = identifier_token.span;
 
@@ -595,7 +621,10 @@ static int beet_parser_parse_postfix_expr(beet_parser *parser,
 
     beet_ast_expr_init(out);
     out->kind = BEET_AST_EXPR_FIELD;
-    out->text = member_token.lexeme;
+    out->text = beet_intern_slice(member_token.lexeme, member_token.lexeme_len);
+    if (out->text == NULL) {
+      return 0;
+    }
     out->text_len = member_token.lexeme_len;
     out->left = base;
     out->span = beet_parser_span_from_bounds(base->span, member_token.span);
@@ -844,7 +873,11 @@ static int beet_parser_parse_binding_with_pool(beet_parser *parser,
     return 0;
   }
 
-  out->name = parser->current.lexeme;
+  out->name =
+      beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+  if (out->name == NULL) {
+    return 0;
+  }
   out->name_len = parser->current.lexeme_len;
   out->is_mutable = is_mutable;
 
@@ -856,7 +889,11 @@ static int beet_parser_parse_binding_with_pool(beet_parser *parser,
     }
 
     out->has_type = 1;
-    out->type_name = parser->current.lexeme;
+    out->type_name =
+        beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+    if (out->type_name == NULL) {
+      return 0;
+    }
     out->type_name_len = parser->current.lexeme_len;
 
     beet_parser_advance(parser);
@@ -916,7 +953,11 @@ static int beet_parser_parse_assignment_stmt(beet_parser *parser,
 
   out->kind = BEET_AST_STMT_ASSIGNMENT;
   name_token = parser->current;
-  out->assignment.name = name_token.lexeme;
+  out->assignment.name =
+      beet_intern_slice(name_token.lexeme, name_token.lexeme_len);
+  if (out->assignment.name == NULL) {
+    return 0;
+  }
   out->assignment.name_len = name_token.lexeme_len;
   out->assignment.span = name_token.span;
   beet_parser_advance(parser);
@@ -1129,7 +1170,11 @@ static int beet_parser_parse_match_stmt(beet_parser *parser,
     }
 
     match_case = &out->match_cases[out->match_case_count];
-    match_case->variant_name = parser->current.lexeme;
+    match_case->variant_name =
+        beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+    if (match_case->variant_name == NULL) {
+      return 0;
+    }
     match_case->variant_name_len = parser->current.lexeme_len;
     beet_parser_advance(parser);
 
@@ -1138,7 +1183,11 @@ static int beet_parser_parse_match_stmt(beet_parser *parser,
       if (parser->current.kind != BEET_TOKEN_IDENTIFIER) {
         return 0;
       }
-      match_case->binding_name = parser->current.lexeme;
+      match_case->binding_name =
+          beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+      if (match_case->binding_name == NULL) {
+        return 0;
+      }
       match_case->binding_name_len = parser->current.lexeme_len;
       beet_parser_advance(parser);
       if (!beet_expect(parser, BEET_TOKEN_RPAREN)) {
@@ -1262,7 +1311,11 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
     return 0;
   }
 
-  out->name = parser->current.lexeme;
+  out->name =
+      beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+  if (out->name == NULL) {
+    return 0;
+  }
   out->name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
@@ -1302,7 +1355,11 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
     return 0;
   }
 
-  out->return_type_name = parser->current.lexeme;
+  out->return_type_name =
+      beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+  if (out->return_type_name == NULL) {
+    return 0;
+  }
   out->return_type_name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
@@ -1345,7 +1402,10 @@ static int beet_parser_parse_field(beet_parser *parser, beet_ast_field *out) {
   }
 
   name_token = parser->current;
-  out->name = name_token.lexeme;
+  out->name = beet_intern_slice(name_token.lexeme, name_token.lexeme_len);
+  if (out->name == NULL) {
+    return 0;
+  }
   out->name_len = name_token.lexeme_len;
   beet_parser_advance(parser);
 
@@ -1358,7 +1418,10 @@ static int beet_parser_parse_field(beet_parser *parser, beet_ast_field *out) {
   }
 
   type_token = parser->current;
-  out->type_name = type_token.lexeme;
+  out->type_name = beet_intern_slice(type_token.lexeme, type_token.lexeme_len);
+  if (out->type_name == NULL) {
+    return 0;
+  }
   out->type_name_len = type_token.lexeme_len;
   out->span = beet_parser_span_from_bounds(name_token.span, type_token.span);
   beet_parser_advance(parser);
@@ -1382,7 +1445,10 @@ static int beet_parser_parse_choice_variant(beet_parser *parser,
   }
 
   name_token = parser->current;
-  out->name = name_token.lexeme;
+  out->name = beet_intern_slice(name_token.lexeme, name_token.lexeme_len);
+  if (out->name == NULL) {
+    return 0;
+  }
   out->name_len = name_token.lexeme_len;
   out->span = name_token.span;
   out->has_payload = 0;
@@ -1400,7 +1466,11 @@ static int beet_parser_parse_choice_variant(beet_parser *parser,
 
   payload_token = parser->current;
   out->has_payload = 1;
-  out->payload_type_name = payload_token.lexeme;
+  out->payload_type_name =
+      beet_intern_slice(payload_token.lexeme, payload_token.lexeme_len);
+  if (out->payload_type_name == NULL) {
+    return 0;
+  }
   out->payload_type_name_len = payload_token.lexeme_len;
   beet_parser_advance(parser);
 
@@ -1429,7 +1499,11 @@ int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out) {
     return 0;
   }
 
-  out->name = parser->current.lexeme;
+  out->name =
+      beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+  if (out->name == NULL) {
+    return 0;
+  }
   out->name_len = parser->current.lexeme_len;
   beet_parser_advance(parser);
 
@@ -1443,7 +1517,11 @@ int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out) {
         return 0;
       }
 
-      out->params[out->param_count].name = parser->current.lexeme;
+      out->params[out->param_count].name =
+          beet_intern_slice(parser->current.lexeme, parser->current.lexeme_len);
+      if (out->params[out->param_count].name == NULL) {
+        return 0;
+      }
       out->params[out->param_count].name_len = parser->current.lexeme_len;
       out->params[out->param_count].span = parser->current.span;
       out->param_count += 1U;

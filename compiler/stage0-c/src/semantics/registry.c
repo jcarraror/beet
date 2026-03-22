@@ -1,11 +1,12 @@
 #include "beet/semantics/registry.h"
 
 #include <assert.h>
-#include <string.h>
+
+#include "beet/support/intern.h"
 
 static int beet_name_equals_slice(const char *left, size_t left_len,
                                   const char *right, size_t right_len) {
-  return left_len == right_len && strncmp(left, right, left_len) == 0;
+  return beet_interned_slice_equals(left, left_len, right, right_len);
 }
 
 void beet_decl_registry_init(beet_decl_registry *registry,

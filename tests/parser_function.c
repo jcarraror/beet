@@ -675,6 +675,30 @@ static void test_match_statement_function(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_parser_interns_identifiers_and_type_names(void) {
+  const char *text = "function identity(x is Int) returns Int {\n"
+                     "    bind y is Int = x\n"
+                     "    return y\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_function function_ast;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_function(&parser, &function_ast));
+
+  assert(function_ast.params[0].type_name == function_ast.return_type_name);
+  assert(function_ast.params[0].type_name ==
+         function_ast.body[0].binding.type_name);
+  assert(function_ast.params[0].name == function_ast.body[0].binding.expr.text);
+  assert(function_ast.body[0].binding.name == function_ast.body[1].expr.text);
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_empty_function();
   test_function_with_params();
@@ -694,5 +718,6 @@ int main(void) {
   test_structure_construction_and_field_access_function();
   test_choice_construction_function();
   test_match_statement_function();
+  test_parser_interns_identifiers_and_type_names();
   return 0;
 }
