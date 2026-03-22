@@ -178,13 +178,13 @@ typedef struct beet_ast_function {
   beet_ast_param params[BEET_AST_MAX_PARAMS];
   size_t param_count;
 
-  beet_ast_stmt body[BEET_AST_MAX_BODY_STMTS];
+  beet_ast_stmt *body;
   size_t body_count;
 
-  beet_ast_stmt stmt_nodes[BEET_AST_MAX_STMT_NODES];
+  beet_ast_stmt *stmt_nodes;
   size_t stmt_node_count;
 
-  beet_ast_expr expr_nodes[BEET_AST_MAX_EXPR_NODES];
+  beet_ast_expr *expr_nodes;
   size_t expr_count;
 } beet_ast_function;
 

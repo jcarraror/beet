@@ -7,7 +7,7 @@
 typedef struct beet_parser {
   beet_lexer lexer;
   beet_token current;
-  beet_ast_expr binding_expr_nodes[BEET_AST_MAX_EXPR_NODES];
+  beet_ast_expr *binding_expr_nodes;
   size_t binding_expr_count;
 } beet_parser;
 

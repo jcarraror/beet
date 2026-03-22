@@ -1,12 +1,66 @@
 #include "beet/parser/parser.h"
 
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct beet_ast_expr_pool {
   beet_ast_expr *expr_nodes;
   size_t *expr_count;
 } beet_ast_expr_pool;
+
+typedef struct beet_parser_allocation {
+  void *ptr;
+  struct beet_parser_allocation *next;
+} beet_parser_allocation;
+
+static beet_parser_allocation *beet_parser_allocations = NULL;
+static int beet_parser_cleanup_registered = 0;
+
+static void beet_parser_cleanup_allocations(void) {
+  beet_parser_allocation *allocation;
+
+  allocation = beet_parser_allocations;
+  while (allocation != NULL) {
+    beet_parser_allocation *next = allocation->next;
+
+    free(allocation->ptr);
+    free(allocation);
+    allocation = next;
+  }
+
+  beet_parser_allocations = NULL;
+}
+
+static void *beet_parser_alloc_zeroed(size_t size) {
+  beet_parser_allocation *allocation;
+  void *ptr;
+
+  if (size == 0U) {
+    return NULL;
+  }
+
+  ptr = calloc(1U, size);
+  if (ptr == NULL) {
+    return NULL;
+  }
+
+  allocation = malloc(sizeof(*allocation));
+  if (allocation == NULL) {
+    free(ptr);
+    return NULL;
+  }
+
+  if (!beet_parser_cleanup_registered) {
+    atexit(beet_parser_cleanup_allocations);
+    beet_parser_cleanup_registered = 1;
+  }
+
+  allocation->ptr = ptr;
+  allocation->next = beet_parser_allocations;
+  beet_parser_allocations = allocation;
+  return ptr;
+}
 
 static beet_source_span beet_parser_zero_span(void) {
   beet_source_span span;
@@ -63,8 +117,8 @@ void beet_parser_init(beet_parser *parser, const beet_source_file *file) {
   assert(parser != NULL);
   assert(file != NULL);
 
+  memset(parser, 0, sizeof(*parser));
   beet_lexer_init(&parser->lexer, file);
-  parser->binding_expr_count = 0U;
   beet_parser_advance(parser);
 }
 
@@ -157,6 +211,11 @@ beet_ast_expr_pool_from_parser_binding(beet_parser *parser) {
 
   assert(parser != NULL);
 
+  if (parser->binding_expr_nodes == NULL) {
+    parser->binding_expr_nodes = beet_parser_alloc_zeroed(
+        sizeof(beet_ast_expr) * BEET_AST_MAX_EXPR_NODES);
+  }
+
   pool.expr_nodes = parser->binding_expr_nodes;
   pool.expr_count = &parser->binding_expr_count;
   return pool;
@@ -199,6 +258,7 @@ static beet_ast_stmt *beet_ast_stmt_alloc(beet_ast_function *function) {
   beet_ast_stmt *stmt;
 
   assert(function != NULL);
+  assert(function->stmt_nodes != NULL);
 
   if (function->stmt_node_count >= BEET_AST_MAX_STMT_NODES) {
     return NULL;
@@ -208,6 +268,20 @@ static beet_ast_stmt *beet_ast_stmt_alloc(beet_ast_function *function) {
   function->stmt_node_count += 1U;
   beet_ast_stmt_init(stmt);
   return stmt;
+}
+
+static int beet_parser_prepare_function_storage(beet_ast_function *function) {
+  assert(function != NULL);
+
+  function->body =
+      beet_parser_alloc_zeroed(sizeof(beet_ast_stmt) * BEET_AST_MAX_BODY_STMTS);
+  function->stmt_nodes =
+      beet_parser_alloc_zeroed(sizeof(beet_ast_stmt) * BEET_AST_MAX_STMT_NODES);
+  function->expr_nodes =
+      beet_parser_alloc_zeroed(sizeof(beet_ast_expr) * BEET_AST_MAX_EXPR_NODES);
+
+  return function->body != NULL && function->stmt_nodes != NULL &&
+         function->expr_nodes != NULL;
 }
 
 static int beet_parser_parse_primary_expr(beet_parser *parser,
@@ -1176,6 +1250,9 @@ int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out) {
   assert(out != NULL);
 
   memset(out, 0, sizeof(*out));
+  if (!beet_parser_prepare_function_storage(out)) {
+    return 0;
+  }
   function_token = parser->current;
   if (!beet_expect(parser, BEET_TOKEN_KW_FUNCTION)) {
     return 0;
