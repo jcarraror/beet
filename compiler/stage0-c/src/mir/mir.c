@@ -3,7 +3,61 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
+
+typedef struct beet_mir_allocation {
+  void *ptr;
+  struct beet_mir_allocation *next;
+} beet_mir_allocation;
+
+static beet_mir_allocation *beet_mir_allocations = NULL;
+static int beet_mir_cleanup_registered = 0;
+
+static void beet_mir_cleanup_allocations(void) {
+  beet_mir_allocation *allocation;
+
+  allocation = beet_mir_allocations;
+  while (allocation != NULL) {
+    beet_mir_allocation *next = allocation->next;
+
+    free(allocation->ptr);
+    free(allocation);
+    allocation = next;
+  }
+
+  beet_mir_allocations = NULL;
+}
+
+static void *beet_mir_alloc_zeroed(size_t size) {
+  beet_mir_allocation *allocation;
+  void *ptr;
+
+  if (size == 0U) {
+    return NULL;
+  }
+
+  ptr = calloc(1U, size);
+  if (ptr == NULL) {
+    return NULL;
+  }
+
+  allocation = malloc(sizeof(*allocation));
+  if (allocation == NULL) {
+    free(ptr);
+    return NULL;
+  }
+
+  if (!beet_mir_cleanup_registered) {
+    atexit(beet_mir_cleanup_allocations);
+    beet_mir_cleanup_registered = 1;
+  }
+
+  allocation->ptr = ptr;
+  allocation->next = beet_mir_allocations;
+  beet_mir_allocations = allocation;
+  return ptr;
+}
 
 static void beet_copy_name(char *dst, const char *src, size_t src_len) {
   size_t copy_len;
@@ -283,6 +337,14 @@ void beet_mir_function_init(beet_mir_function *function, const char *name,
                             size_t name_len) {
   assert(function != NULL);
   assert(name != NULL);
+
+  memset(function, 0, sizeof(*function));
+  function->instrs =
+      beet_mir_alloc_zeroed(sizeof(beet_mir_instr) * BEET_MIR_MAX_INSTRS);
+  function->locals =
+      beet_mir_alloc_zeroed(sizeof(*function->locals) * BEET_MIR_MAX_LOCALS);
+  assert(function->instrs != NULL);
+  assert(function->locals != NULL);
 
   beet_copy_name(function->name, name, name_len);
   function->instr_count = 0U;

@@ -69,6 +69,24 @@ configure_build_test() {
     ctest --test-dir build --output-on-failure
 }
 
+run_sanitizer_tests() {
+    if [ "${BEET_SKIP_SANITIZERS:-0}" = "1" ]; then
+        say "[beet] BEET_SKIP_SANITIZERS=1; skipping sanitizers"
+        return 0
+    fi
+
+    say "[beet] configuring sanitizer build"
+    cmake -S . -B build-sanitize -DBEET_ENABLE_SANITIZERS=ON
+
+    say "[beet] building sanitizer targets"
+    cmake --build build-sanitize
+
+    say "[beet] testing under sanitizers"
+    ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1}" \
+    UBSAN_OPTIONS="${UBSAN_OPTIONS:-halt_on_error=1:print_stacktrace=1}" \
+        ctest --test-dir build-sanitize --output-on-failure
+}
+
 run_valgrind_tests() {
     if [ "${BEET_SKIP_VALGRIND:-0}" = "1" ]; then
         say "[beet] BEET_SKIP_VALGRIND=1; skipping valgrind"
@@ -104,7 +122,6 @@ run_valgrind_tests() {
         valgrind \
             --quiet \
             --error-exitcode=1 \
-            --max-stackframe="${BEET_VALGRIND_MAX_STACKFRAME:-8388608}" \
             --leak-check=full \
             --show-leak-kinds=definite,possible \
             --errors-for-leak-kinds=definite,possible \
@@ -125,4 +142,5 @@ fi
 
 configure_build_test
 run_valgrind_tests
+run_sanitizer_tests
 say "[beet] checks passed"

@@ -12,8 +12,25 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(warnings)
 
+option(BEET_ENABLE_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
+
 add_library(beet_warnings INTERFACE)
 target_compile_options(beet_warnings INTERFACE ${BEET_WARNING_FLAGS})
+
+add_library(beet_sanitizers INTERFACE)
+if(BEET_ENABLE_SANITIZERS)
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(beet_sanitizers INTERFACE
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(beet_sanitizers INTERFACE
+            -fsanitize=address,undefined
+        )
+    else()
+        message(FATAL_ERROR "BEET_ENABLE_SANITIZERS requires Clang or GCC")
+    endif()
+endif()
 
 add_library(beet_compiler_support
     compiler/stage0-c/src/support/source.c
@@ -34,7 +51,7 @@ target_include_directories(beet_compiler_support
         ${CMAKE_CURRENT_SOURCE_DIR}/compiler/stage0-c/include
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime/vm/include
 )
-target_link_libraries(beet_compiler_support PUBLIC beet_warnings)
+target_link_libraries(beet_compiler_support PUBLIC beet_warnings beet_sanitizers)
 
 add_executable(beetc0
     compiler/stage0-c/src/main.c
@@ -44,7 +61,7 @@ target_include_directories(beetc0
         ${CMAKE_CURRENT_SOURCE_DIR}/compiler/stage0-c/include
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime/vm/include
 )
-target_link_libraries(beetc0 PRIVATE beet_compiler_support)
+target_link_libraries(beetc0 PRIVATE beet_compiler_support beet_sanitizers)
 
 add_executable(beet-vm
     runtime/vm/src/main.c
@@ -55,17 +72,19 @@ target_include_directories(beet-vm
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime/vm/include
 )
-target_link_libraries(beet-vm PRIVATE beet_warnings)
+target_link_libraries(beet-vm PRIVATE beet_warnings beet_sanitizers)
 
 add_executable(test_smoke_compiler
     tests/smoke_compiler.c
 )
 target_link_libraries(test_smoke_compiler PRIVATE beet_warnings)
+target_link_libraries(test_smoke_compiler PRIVATE beet_sanitizers)
 
 add_executable(test_smoke_vm
     tests/smoke_vm.c
 )
 target_link_libraries(test_smoke_vm PRIVATE beet_warnings)
+target_link_libraries(test_smoke_vm PRIVATE beet_sanitizers)
 
 add_executable(test_diag_print
     tests/diag_print.c

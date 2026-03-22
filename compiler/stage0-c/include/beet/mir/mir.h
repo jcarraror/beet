@@ -48,10 +48,10 @@ typedef struct beet_mir_instr {
 
 typedef struct beet_mir_function {
   char name[BEET_MIR_MAX_NAME_LEN];
-  beet_mir_instr instrs[BEET_MIR_MAX_INSTRS];
+  beet_mir_instr *instrs;
   size_t instr_count;
 
-  char locals[BEET_MIR_MAX_LOCALS][BEET_MIR_MAX_NAME_LEN];
+  char (*locals)[BEET_MIR_MAX_NAME_LEN];
   size_t local_count;
   size_t param_count;
 

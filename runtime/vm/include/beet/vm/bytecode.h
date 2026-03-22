@@ -30,14 +30,14 @@ typedef enum beet_bc_opcode {
 } beet_bc_opcode;
 
 typedef struct beet_bytecode_function {
-  int code[BEET_BC_MAX_CODE];
+  int *code;
   size_t code_count;
   size_t local_count;
   size_t param_count;
 } beet_bytecode_function;
 
 typedef struct beet_bytecode_program {
-  beet_bytecode_function functions[BEET_BC_MAX_FUNCTIONS];
+  beet_bytecode_function *functions;
   size_t function_count;
 } beet_bytecode_program;
 
