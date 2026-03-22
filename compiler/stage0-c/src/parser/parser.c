@@ -133,51 +133,11 @@ static void beet_ast_expr_init(beet_ast_expr *expr) {
 }
 
 static void beet_ast_stmt_init(beet_ast_stmt *stmt) {
-  size_t i;
-
   assert(stmt != NULL);
 
+  memset(stmt, 0, sizeof(*stmt));
   stmt->kind = BEET_AST_STMT_INVALID;
   stmt->span = beet_parser_zero_span();
-  stmt->binding.name = NULL;
-  stmt->binding.name_len = 0U;
-  stmt->binding.span = beet_parser_zero_span();
-  stmt->binding.is_mutable = 0;
-  stmt->binding.has_type = 0;
-  stmt->binding.type_name = NULL;
-  stmt->binding.type_name_len = 0U;
-  stmt->binding.resolved_type_decl = NULL;
-  stmt->binding.value_text = NULL;
-  stmt->binding.value_len = 0U;
-  beet_ast_expr_init(&stmt->binding.expr);
-  stmt->assignment.name = NULL;
-  stmt->assignment.name_len = 0U;
-  stmt->assignment.span = beet_parser_zero_span();
-  stmt->assignment.is_resolved = 0;
-  stmt->assignment.resolved_depth = 0U;
-  stmt->assignment.resolved_is_mutable = 0;
-  beet_ast_expr_init(&stmt->expr);
-  beet_ast_expr_init(&stmt->condition);
-  beet_ast_expr_init(&stmt->match_expr);
-  stmt->match_case_count = 0U;
-  for (i = 0U; i < BEET_AST_MAX_VARIANTS; ++i) {
-    stmt->match_cases[i].variant_name = NULL;
-    stmt->match_cases[i].variant_name_len = 0U;
-    stmt->match_cases[i].span = beet_parser_zero_span();
-    stmt->match_cases[i].binds_payload = 0;
-    stmt->match_cases[i].resolved_variant_decl = NULL;
-    stmt->match_cases[i].resolved_variant_index = 0U;
-    stmt->match_cases[i].binding_name = NULL;
-    stmt->match_cases[i].binding_name_len = 0U;
-    stmt->match_cases[i].body = NULL;
-    stmt->match_cases[i].body_count = 0U;
-  }
-  stmt->then_body = NULL;
-  stmt->then_body_count = 0U;
-  stmt->else_body = NULL;
-  stmt->else_body_count = 0U;
-  stmt->loop_body = NULL;
-  stmt->loop_body_count = 0U;
 }
 
 static beet_ast_expr_pool

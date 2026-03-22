@@ -134,19 +134,27 @@ typedef struct beet_ast_match_case {
 typedef struct beet_ast_stmt {
   beet_ast_stmt_kind kind;
   beet_source_span span;
-  beet_ast_binding binding;
-  beet_ast_assignment assignment;
-  beet_ast_expr expr;
-  beet_ast_expr condition;
-  beet_ast_expr match_expr;
-  beet_ast_match_case match_cases[BEET_AST_MAX_VARIANTS];
-  size_t match_case_count;
-  struct beet_ast_stmt *then_body;
-  size_t then_body_count;
-  struct beet_ast_stmt *else_body;
-  size_t else_body_count;
-  struct beet_ast_stmt *loop_body;
-  size_t loop_body_count;
+  union {
+    beet_ast_binding binding;
+    struct {
+      beet_ast_assignment assignment;
+      beet_ast_expr expr;
+    };
+    struct {
+      beet_ast_expr condition;
+      struct beet_ast_stmt *then_body;
+      size_t then_body_count;
+      struct beet_ast_stmt *else_body;
+      size_t else_body_count;
+      struct beet_ast_stmt *loop_body;
+      size_t loop_body_count;
+    };
+    struct {
+      beet_ast_expr match_expr;
+      beet_ast_match_case match_cases[BEET_AST_MAX_VARIANTS];
+      size_t match_case_count;
+    };
+  };
 } beet_ast_stmt;
 
 typedef struct beet_ast_param {
