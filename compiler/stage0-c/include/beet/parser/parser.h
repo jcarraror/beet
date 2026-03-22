@@ -16,5 +16,6 @@ void beet_parser_init(beet_parser *parser, const beet_source_file *file);
 int beet_parser_parse_binding(beet_parser *parser, beet_ast_binding *out);
 int beet_parser_parse_function(beet_parser *parser, beet_ast_function *out);
 int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out);
+int beet_parser_parse_module(beet_parser *parser, beet_ast_module *out);
 
 #endif

@@ -11,6 +11,8 @@
 #define BEET_AST_MAX_BODY_STMTS 64
 #define BEET_AST_MAX_STMT_NODES 128
 #define BEET_AST_MAX_EXPR_NODES 128
+#define BEET_AST_MAX_TOPLEVEL_TYPES 32
+#define BEET_AST_MAX_TOPLEVEL_FUNCTIONS 32
 
 typedef enum beet_ast_expr_kind {
   BEET_AST_EXPR_INVALID = 0,
@@ -230,5 +232,17 @@ typedef struct beet_ast_type_decl {
   beet_ast_choice_variant variants[BEET_AST_MAX_VARIANTS];
   size_t variant_count;
 } beet_ast_type_decl;
+
+typedef struct beet_ast_module {
+  const char *name;
+  size_t name_len;
+  beet_source_span span;
+
+  beet_ast_type_decl *type_decls;
+  size_t type_decl_count;
+
+  beet_ast_function *functions;
+  size_t function_count;
+} beet_ast_module;
 
 #endif

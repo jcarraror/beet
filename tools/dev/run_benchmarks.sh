@@ -6,6 +6,16 @@ latest_json="$repo_root/docs/benchmarks/latest.json"
 save_path=""
 compare_path=""
 json_only=0
+previous_tmp=""
+
+cleanup() {
+    if [ -n "$tmp_json" ] && [ -f "$tmp_json" ]; then
+        rm -f "$tmp_json"
+    fi
+    if [ -n "$previous_tmp" ] && [ -f "$previous_tmp" ]; then
+        rm -f "$previous_tmp"
+    fi
+}
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -34,7 +44,7 @@ cmake -S . -B build >&2
 cmake --build build --target bench_frontend >&2
 mkdir -p "$repo_root/docs/benchmarks"
 tmp_json="$(mktemp)"
-trap 'rm -f "$tmp_json"' EXIT HUP INT TERM
+trap cleanup EXIT HUP INT TERM
 ./build/bench_frontend --json > "$tmp_json"
 mv "$tmp_json" "$latest_json"
 
@@ -48,5 +58,11 @@ if [ "$json_only" -eq 1 ]; then
 elif [ -n "$compare_path" ]; then
     python3 "$repo_root/tools/dev/compare_benchmarks.py" "$compare_path" "$latest_json"
 else
-    python3 "$repo_root/tools/dev/compare_benchmarks.py" "$latest_json"
+    previous_tmp="$(mktemp)"
+    if git show HEAD~1:docs/benchmarks/latest.json > "$previous_tmp" 2>/dev/null; then
+        python3 "$repo_root/tools/dev/compare_benchmarks.py" "$previous_tmp" "$latest_json"
+    else
+        python3 "$repo_root/tools/dev/compare_benchmarks.py" "$latest_json"
+        echo "note: no previous committed benchmark snapshot to compare against" >&2
+    fi
 fi

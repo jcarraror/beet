@@ -19,6 +19,46 @@ void beet_decl_registry_init(beet_decl_registry *registry,
   registry->function_count = function_count;
 }
 
+void beet_module_symbols_init(beet_module_symbols *symbols,
+                              const beet_ast_module *module) {
+  assert(symbols != NULL);
+  assert(module != NULL);
+
+  symbols->name = module->name;
+  symbols->name_len = module->name_len;
+  symbols->span = module->span;
+  beet_decl_registry_init(&symbols->decls, module->type_decls,
+                          module->type_decl_count, module->functions,
+                          module->function_count);
+}
+
+int beet_module_symbols_validate(const beet_module_symbols *symbols) {
+  size_t i;
+  size_t j;
+
+  assert(symbols != NULL);
+
+  for (i = 0U; i < symbols->decls.type_decl_count; ++i) {
+    for (j = i + 1U; j < symbols->decls.type_decl_count; ++j) {
+      if (beet_symbol_eq(symbols->decls.type_decls[i].name,
+                         symbols->decls.type_decls[j].name)) {
+        return 0;
+      }
+    }
+  }
+
+  for (i = 0U; i < symbols->decls.function_count; ++i) {
+    for (j = i + 1U; j < symbols->decls.function_count; ++j) {
+      if (beet_symbol_eq(symbols->decls.function_decls[i].name,
+                         symbols->decls.function_decls[j].name)) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+
 const beet_ast_type_decl *
 beet_decl_registry_find_type(const beet_decl_registry *registry,
                              const char *name, size_t name_len) {

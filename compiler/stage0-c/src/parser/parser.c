@@ -307,6 +307,17 @@ static int beet_parser_prepare_function_storage(beet_ast_function *function) {
          function->expr_nodes != NULL;
 }
 
+static int beet_parser_prepare_module_storage(beet_ast_module *module) {
+  assert(module != NULL);
+
+  module->type_decls = beet_parser_alloc_zeroed(sizeof(beet_ast_type_decl) *
+                                                BEET_AST_MAX_TOPLEVEL_TYPES);
+  module->functions = beet_parser_alloc_zeroed(sizeof(beet_ast_function) *
+                                               BEET_AST_MAX_TOPLEVEL_FUNCTIONS);
+
+  return module->type_decls != NULL && module->functions != NULL;
+}
+
 static int beet_parser_parse_primary_expr(beet_parser *parser,
                                           beet_ast_expr_pool *pool,
                                           beet_ast_expr *out);
@@ -1610,5 +1621,71 @@ int beet_parser_parse_type_decl(beet_parser *parser, beet_ast_type_decl *out) {
   }
 
   out->span = beet_parser_span_from_bounds(type_token.span, close_token.span);
+  return 1;
+}
+
+int beet_parser_parse_module(beet_parser *parser, beet_ast_module *out) {
+  beet_token module_token;
+  beet_token name_token;
+  beet_source_span end_span;
+
+  assert(parser != NULL);
+  assert(out != NULL);
+
+  memset(out, 0, sizeof(*out));
+  if (!beet_parser_prepare_module_storage(out)) {
+    return 0;
+  }
+
+  if (!beet_expect_with_token(parser, BEET_TOKEN_KW_MODULE, &module_token)) {
+    return 0;
+  }
+
+  if (!beet_expect_with_token(parser, BEET_TOKEN_IDENTIFIER, &name_token)) {
+    return 0;
+  }
+
+  out->name = beet_intern_slice(name_token.lexeme, name_token.lexeme_len);
+  if (out->name == NULL) {
+    return 0;
+  }
+  out->name_len = name_token.lexeme_len;
+  end_span = name_token.span;
+
+  while (parser->current.kind != BEET_TOKEN_EOF) {
+    if (parser->current.kind == BEET_TOKEN_KW_TYPE) {
+      if (out->type_decl_count >= BEET_AST_MAX_TOPLEVEL_TYPES) {
+        return 0;
+      }
+
+      if (!beet_parser_parse_type_decl(
+              parser, &out->type_decls[out->type_decl_count])) {
+        return 0;
+      }
+
+      end_span = out->type_decls[out->type_decl_count].span;
+      out->type_decl_count += 1U;
+      continue;
+    }
+
+    if (parser->current.kind == BEET_TOKEN_KW_FUNCTION) {
+      if (out->function_count >= BEET_AST_MAX_TOPLEVEL_FUNCTIONS) {
+        return 0;
+      }
+
+      if (!beet_parser_parse_function(parser,
+                                      &out->functions[out->function_count])) {
+        return 0;
+      }
+
+      end_span = out->functions[out->function_count].span;
+      out->function_count += 1U;
+      continue;
+    }
+
+    return 0;
+  }
+
+  out->span = beet_parser_span_from_bounds(module_token.span, end_span);
   return 1;
 }

@@ -145,41 +145,40 @@ static int beet_bench_build_source(char *buffer, size_t capacity,
   }
 
   for (i = 0U; i < 24U; ++i) {
-    if (!beet_bench_append(
-            buffer, capacity, &offset,
-            "    total = total + 1\n")) {
+    if (!beet_bench_append(buffer, capacity, &offset,
+                           "    total = total + 1\n")) {
       return 0;
     }
   }
 
-  if (!beet_bench_append(buffer, capacity, &offset,
-                         "    if total > 10 {\n"
-                         "        total = total - 1\n"
-                         "    } else {\n"
-                         "        total = total + 2\n"
-                         "    }\n"
-                         "    return total\n"
-                         "}\n"
-                         "\n"
-                         "function main() returns Int {\n"
-                         "    mutable total = 0\n"
-                         "    bind pair is Pair = Pair(left = 1, right = 2)\n"
-                         "    bind maybe_value is OptionInt = OptionInt.some(pair.left)\n"
-                         "    match maybe_value {\n"
-                         "        case none {\n"
-                         "            return 0\n"
-                         "        }\n"
-                         "        case some(item) {\n"
-                         "            total = helper(item)\n"
-                         "        }\n"
-                         "    }\n")) {
+  if (!beet_bench_append(
+          buffer, capacity, &offset,
+          "    if total > 10 {\n"
+          "        total = total - 1\n"
+          "    } else {\n"
+          "        total = total + 2\n"
+          "    }\n"
+          "    return total\n"
+          "}\n"
+          "\n"
+          "function main() returns Int {\n"
+          "    mutable total = 0\n"
+          "    bind pair is Pair = Pair(left = 1, right = 2)\n"
+          "    bind maybe_value is OptionInt = OptionInt.some(pair.left)\n"
+          "    match maybe_value {\n"
+          "        case none {\n"
+          "            return 0\n"
+          "        }\n"
+          "        case some(item) {\n"
+          "            total = helper(item)\n"
+          "        }\n"
+          "    }\n")) {
     return 0;
   }
 
   for (i = 0U; i < 24U; ++i) {
-    if (!beet_bench_append(
-            buffer, capacity, &offset,
-            "    total = total + 1\n")) {
+    if (!beet_bench_append(buffer, capacity, &offset,
+                           "    total = total + 1\n")) {
       return 0;
     }
   }
@@ -239,7 +238,8 @@ static int beet_bench_parse_fixture(beet_bench_fixture *fixture,
     if (!beet_parser_parse_function(
             &fixture->parser, &fixture->functions[fixture->function_count])) {
       fprintf(stderr, "benchmark parse: failed function %zu at token %s\n",
-              fixture->function_count, beet_token_kind_name(fixture->parser.current.kind));
+              fixture->function_count,
+              beet_token_kind_name(fixture->parser.current.kind));
       beet_source_file_dispose(&fixture->file);
       return 0;
     }
@@ -266,8 +266,7 @@ static void beet_bench_dispose_fixture(beet_bench_fixture *fixture) {
 }
 
 static int beet_bench_run_parse(const char *source_text, size_t warmup_iters,
-                                size_t measure_iters,
-                                double *out_seconds) {
+                                size_t measure_iters, double *out_seconds) {
   size_t i;
   double start;
 
@@ -313,8 +312,8 @@ static int beet_bench_run_resolve(const char *source_text, size_t warmup_iters,
   for (i = 0U; i < warmup_iters; ++i) {
     for (function_index = 0U; function_index < fixture.function_count;
          ++function_index) {
-      if (!beet_resolve_function_with_registry(&fixture.functions[function_index],
-                                               &fixture.registry)) {
+      if (!beet_resolve_function_with_registry(
+              &fixture.functions[function_index], &fixture.registry)) {
         beet_bench_dispose_fixture(&fixture);
         return 0;
       }
@@ -325,8 +324,8 @@ static int beet_bench_run_resolve(const char *source_text, size_t warmup_iters,
   for (i = 0U; i < measure_iters; ++i) {
     for (function_index = 0U; function_index < fixture.function_count;
          ++function_index) {
-      if (!beet_resolve_function_with_registry(&fixture.functions[function_index],
-                                               &fixture.registry)) {
+      if (!beet_resolve_function_with_registry(
+              &fixture.functions[function_index], &fixture.registry)) {
         beet_bench_dispose_fixture(&fixture);
         return 0;
       }
@@ -338,8 +337,7 @@ static int beet_bench_run_resolve(const char *source_text, size_t warmup_iters,
 }
 
 static int beet_bench_run_type_check(const char *source_text,
-                                     size_t warmup_iters,
-                                     size_t measure_iters,
+                                     size_t warmup_iters, size_t measure_iters,
                                      double *out_seconds) {
   beet_bench_fixture fixture;
   size_t i;
@@ -498,10 +496,12 @@ static int beet_bench_collect_samples(
   return 1;
 }
 
-static void beet_bench_print_text_result(const beet_bench_phase_summary *summary) {
+static void
+beet_bench_print_text_result(const beet_bench_phase_summary *summary) {
   assert(summary != NULL);
 
-  printf("%-10s %7zu iters  %7zu samples  %8.3f ms  %8.3f..%-8.3f ms  %8.2f MiB/s\n",
+  printf("%-10s %7zu iters  %7zu samples  %8.3f ms  %8.3f..%-8.3f ms  %8.2f "
+         "MiB/s\n",
          summary->label, summary->iterations, summary->samples,
          summary->median_seconds * 1000.0, summary->min_seconds * 1000.0,
          summary->max_seconds * 1000.0, summary->mib_per_second);
@@ -536,7 +536,8 @@ static void beet_bench_print_json(const beet_bench_phase_summary *summaries,
   assert(summary_count > 0U);
 
   hotspot = beet_bench_find_hotspot(summaries, summary_count);
-  printf("{\"source_bytes\":%zu,\"target_ms\":%.3f,\"hotspot\":\"%s\",\"phases\":[",
+  printf("{\"source_bytes\":%zu,\"target_ms\":%.3f,\"hotspot\":\"%s\","
+         "\"phases\":[",
          source_len, target_ms, hotspot->label);
   for (i = 0U; i < summary_count; ++i) {
     const beet_bench_phase_summary *summary = &summaries[i];
@@ -578,16 +579,16 @@ int main(int argc, char **argv) {
 
   parse_warmup = beet_bench_env_size("BEET_BENCH_PARSE_WARMUP",
                                      BEET_BENCH_PARSE_WARMUP_DEFAULT);
-  parse_iters =
-      beet_bench_env_size("BEET_BENCH_PARSE_ITERS", BEET_BENCH_PARSE_ITERS_DEFAULT);
+  parse_iters = beet_bench_env_size("BEET_BENCH_PARSE_ITERS",
+                                    BEET_BENCH_PARSE_ITERS_DEFAULT);
   resolve_warmup = beet_bench_env_size("BEET_BENCH_RESOLVE_WARMUP",
                                        BEET_BENCH_RESOLVE_WARMUP_DEFAULT);
   resolve_iters = beet_bench_env_size("BEET_BENCH_RESOLVE_ITERS",
                                       BEET_BENCH_RESOLVE_ITERS_DEFAULT);
   type_warmup = beet_bench_env_size("BEET_BENCH_TYPE_WARMUP",
                                     BEET_BENCH_TYPE_WARMUP_DEFAULT);
-  type_iters =
-      beet_bench_env_size("BEET_BENCH_TYPE_ITERS", BEET_BENCH_TYPE_ITERS_DEFAULT);
+  type_iters = beet_bench_env_size("BEET_BENCH_TYPE_ITERS",
+                                   BEET_BENCH_TYPE_ITERS_DEFAULT);
   sample_count =
       beet_bench_env_size("BEET_BENCH_SAMPLES", BEET_BENCH_SAMPLES_DEFAULT);
   if (sample_count > 32U) {

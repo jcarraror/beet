@@ -117,6 +117,11 @@ add_executable(test_parser_type_decl
 )
 target_link_libraries(test_parser_type_decl PRIVATE beet_compiler_support)
 
+add_executable(test_parser_module
+    tests/parser_module.c
+)
+target_link_libraries(test_parser_module PRIVATE beet_compiler_support)
+
 add_executable(test_resolve_scope
     tests/resolve_scope.c
 )
@@ -160,6 +165,7 @@ add_test(NAME lexer_tokens COMMAND test_lexer_tokens)
 add_test(NAME parser_binding COMMAND test_parser_binding)
 add_test(NAME parser_function COMMAND test_parser_function)
 add_test(NAME parser_type_decl COMMAND test_parser_type_decl)
+add_test(NAME parser_module COMMAND test_parser_module)
 add_test(NAME resolve_scope COMMAND test_resolve_scope)
 add_test(NAME semantic_registry COMMAND test_semantic_registry)
 add_test(NAME types_check COMMAND test_types_check)

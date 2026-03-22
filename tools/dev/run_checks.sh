@@ -131,6 +131,8 @@ run_valgrind_tests() {
 }
 
 run_frontend_benchmark() {
+    previous_benchmark_tmp=""
+
     if [ "${BEET_SKIP_BENCHMARKS:-0}" = "1" ]; then
         say "[beet] BEET_SKIP_BENCHMARKS=1; skipping frontend benchmark"
         return 0
@@ -144,7 +146,14 @@ run_frontend_benchmark() {
     ./build/bench_frontend --json > docs/benchmarks/latest.json
     say "[beet] wrote benchmark snapshot: docs/benchmarks/latest.json"
     if have_cmd python3; then
-        python3 ./tools/dev/compare_benchmarks.py docs/benchmarks/latest.json
+        previous_benchmark_tmp="$(mktemp)"
+        if git show HEAD~1:docs/benchmarks/latest.json > "$previous_benchmark_tmp" 2>/dev/null; then
+            python3 ./tools/dev/compare_benchmarks.py "$previous_benchmark_tmp" docs/benchmarks/latest.json
+        else
+            python3 ./tools/dev/compare_benchmarks.py docs/benchmarks/latest.json
+            say "[beet] no previous committed benchmark snapshot to compare against"
+        fi
+        rm -f "$previous_benchmark_tmp"
     else
         say "[beet] python3 not found; benchmark summary unavailable"
     fi

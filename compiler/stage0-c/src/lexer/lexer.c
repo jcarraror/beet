@@ -88,6 +88,9 @@ static beet_token_kind beet_identifier_kind(const char *text, size_t len) {
   if (len == 4U && strncmp(text, "type", 4U) == 0) {
     return BEET_TOKEN_KW_TYPE;
   }
+  if (len == 6U && strncmp(text, "module", 6U) == 0) {
+    return BEET_TOKEN_KW_MODULE;
+  }
   if (len == 9U && strncmp(text, "structure", 9U) == 0) {
     return BEET_TOKEN_KW_STRUCTURE;
   }
@@ -162,6 +165,8 @@ const char *beet_token_kind_name(beet_token_kind kind) {
     return "kw_is";
   case BEET_TOKEN_KW_TYPE:
     return "kw_type";
+  case BEET_TOKEN_KW_MODULE:
+    return "kw_module";
   case BEET_TOKEN_KW_STRUCTURE:
     return "kw_structure";
   case BEET_TOKEN_KW_CHOICE:

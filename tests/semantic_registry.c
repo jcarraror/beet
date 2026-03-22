@@ -104,7 +104,93 @@ static void test_registry_shared_across_frontend_layers(void) {
   beet_source_file_dispose(&file);
 }
 
+static void test_module_symbols_wrap_shared_registry(void) {
+  const char *text = "module core\n"
+                     "\n"
+                     "type MaybeInt = choice {\n"
+                     "    none\n"
+                     "    some(Int)\n"
+                     "}\n"
+                     "\n"
+                     "function helper(x is Int) returns Int {\n"
+                     "    return x\n"
+                     "}\n"
+                     "\n"
+                     "function main() returns Int {\n"
+                     "    return helper(7)\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_module module;
+  beet_module_symbols symbols;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_module(&parser, &module));
+  beet_module_symbols_init(&symbols, &module);
+  assert(beet_module_symbols_validate(&symbols));
+  assert(beet_decl_registry_find_type(&symbols.decls, "MaybeInt", 8U) ==
+         &module.type_decls[0]);
+  assert(beet_decl_registry_find_function(&symbols.decls, "main", 4U) ==
+         &module.functions[1]);
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_module_symbols_reject_duplicate_type_names(void) {
+  const char *text = "module dup_types\n"
+                     "type Point = structure {\n"
+                     "    x is Int\n"
+                     "}\n"
+                     "type Point = structure {\n"
+                     "    y is Int\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_module module;
+  beet_module_symbols symbols;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_module(&parser, &module));
+  beet_module_symbols_init(&symbols, &module);
+  assert(!beet_module_symbols_validate(&symbols));
+
+  beet_source_file_dispose(&file);
+}
+
+static void test_module_symbols_reject_duplicate_function_names(void) {
+  const char *text = "module dup_functions\n"
+                     "function main() returns Int {\n"
+                     "    return 7\n"
+                     "}\n"
+                     "function main() returns Int {\n"
+                     "    return 9\n"
+                     "}\n";
+  beet_source_file file;
+  beet_parser parser;
+  beet_ast_module module;
+  beet_module_symbols symbols;
+
+  beet_source_file_init(&file);
+  assert(beet_source_file_set_text_copy(&file, "test.beet", text));
+  beet_parser_init(&parser, &file);
+
+  assert(beet_parser_parse_module(&parser, &module));
+  beet_module_symbols_init(&symbols, &module);
+  assert(!beet_module_symbols_validate(&symbols));
+
+  beet_source_file_dispose(&file);
+}
+
 int main(void) {
   test_registry_shared_across_frontend_layers();
+  test_module_symbols_wrap_shared_registry();
+  test_module_symbols_reject_duplicate_type_names();
+  test_module_symbols_reject_duplicate_function_names();
   return 0;
 }

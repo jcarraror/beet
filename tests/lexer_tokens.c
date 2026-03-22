@@ -230,6 +230,32 @@ static void test_comparison_operator_tokens(void) {
                sizeof(expected) / sizeof(expected[0]));
 }
 
+static void test_module_keyword_tokens(void) {
+  static const char *text = "module core\n"
+                            "type Point = structure {\n"
+                            "    x is Int\n"
+                            "}\n"
+                            "function main() returns Int {\n"
+                            "    return 7\n"
+                            "}\n";
+
+  static const expected_token expected[] = {
+      {BEET_TOKEN_KW_MODULE, "module"}, {BEET_TOKEN_IDENTIFIER, "core"},
+      {BEET_TOKEN_KW_TYPE, "type"},     {BEET_TOKEN_IDENTIFIER, "Point"},
+      {BEET_TOKEN_EQUAL, "="},          {BEET_TOKEN_KW_STRUCTURE, "structure"},
+      {BEET_TOKEN_LBRACE, "{"},         {BEET_TOKEN_IDENTIFIER, "x"},
+      {BEET_TOKEN_KW_IS, "is"},         {BEET_TOKEN_IDENTIFIER, "Int"},
+      {BEET_TOKEN_RBRACE, "}"},         {BEET_TOKEN_KW_FUNCTION, "function"},
+      {BEET_TOKEN_IDENTIFIER, "main"},  {BEET_TOKEN_LPAREN, "("},
+      {BEET_TOKEN_RPAREN, ")"},         {BEET_TOKEN_KW_RETURNS, "returns"},
+      {BEET_TOKEN_IDENTIFIER, "Int"},   {BEET_TOKEN_LBRACE, "{"},
+      {BEET_TOKEN_KW_RETURN, "return"}, {BEET_TOKEN_INT_LITERAL, "7"},
+      {BEET_TOKEN_RBRACE, "}"}};
+
+  check_tokens("module_tokens.beet", text, expected,
+               sizeof(expected) / sizeof(expected[0]));
+}
+
 int main(void) {
   test_binding_and_function_tokens();
   test_type_and_structure_tokens();
@@ -238,5 +264,6 @@ int main(void) {
   test_control_flow_keyword_tokens();
   test_arithmetic_operator_tokens();
   test_comparison_operator_tokens();
+  test_module_keyword_tokens();
   return 0;
 }

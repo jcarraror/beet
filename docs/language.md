@@ -28,6 +28,12 @@ function name(param is Type, ...) returns Type {
 
 ---
 
+## Modules
+
+module Name
+
+---
+
 ## Types
 
 type Name = TypeExpression

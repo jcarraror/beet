@@ -19,6 +19,8 @@ The canonical per-run benchmark artifact is:
 - `docs/benchmarks/latest.json`
 
 `tools/dev/run_checks.sh` now writes this file automatically.
+`tools/dev/run_benchmarks.sh` and `tools/dev/run_checks.sh` also try to compare
+the fresh snapshot against the previous committed `docs/benchmarks/latest.json`.
 
 Treat that JSON file as the current performance snapshot for the working tree.
 
@@ -27,14 +29,11 @@ Treat that JSON file as the current performance snapshot for the working tree.
 When a commit may affect compiler performance, compare benchmark JSON before and
 after the change.
 
-The minimum workflow is:
+The default workflow is:
 
-1. save a baseline snapshot before the change
-2. make the change
-3. run checks again to generate a new `latest.json`
-4. compare baseline vs latest
-
-Example:
+1. commit a benchmark-bearing change
+2. run `tools/dev/run_checks.sh` or `tools/dev/run_benchmarks.sh`
+3. read the automatic comparison against the previous committed snapshot
 
 ```sh
 tools/dev/run_benchmarks.sh --save docs/benchmarks/baseline.json
