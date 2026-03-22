@@ -17,9 +17,15 @@ typedef struct beet_local_type {
 
 #define BEET_TYPE_CHECK_MAX_LOCALS 128
 
-static int beet_name_equals_slice(const char *left, size_t left_len,
-                                  const char *right, size_t right_len) {
-  return beet_interned_slice_equals(left, left_len, right, right_len);
+static beet_symbol_id beet_symbol_from_name_slice(const char *name,
+                                                  size_t name_len) {
+  beet_symbol_id id;
+
+  assert(name != NULL);
+
+  id = beet_intern_slice(name, name_len);
+  assert(id != NULL);
+  return id;
 }
 
 static const beet_local_type *
@@ -122,14 +128,15 @@ beet_type_from_name_slice_in_context(const char *name, size_t name_len,
 static const beet_ast_field *
 beet_find_structure_field(const beet_ast_type_decl *type_decl, const char *name,
                           size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(type_decl != NULL);
   assert(name != NULL);
 
+  id = beet_symbol_from_name_slice(name, name_len);
   for (i = 0U; i < type_decl->field_count; ++i) {
-    if (beet_name_equals_slice(type_decl->fields[i].name,
-                               type_decl->fields[i].name_len, name, name_len)) {
+    if (beet_symbol_eq(type_decl->fields[i].name, id)) {
       return &type_decl->fields[i];
     }
   }
@@ -140,15 +147,15 @@ beet_find_structure_field(const beet_ast_type_decl *type_decl, const char *name,
 static const beet_ast_choice_variant *
 beet_find_choice_variant(const beet_ast_type_decl *type_decl, const char *name,
                          size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(type_decl != NULL);
   assert(name != NULL);
 
+  id = beet_symbol_from_name_slice(name, name_len);
   for (i = 0U; i < type_decl->variant_count; ++i) {
-    if (beet_name_equals_slice(type_decl->variants[i].name,
-                               type_decl->variants[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(type_decl->variants[i].name, id)) {
       return &type_decl->variants[i];
     }
   }
@@ -217,8 +224,12 @@ beet_type_check_expr(beet_ast_expr *expr, const beet_local_type *locals,
     const beet_ast_function *function_decl;
     size_t i;
 
-    function_decl = beet_find_function_decl(function_decls, function_count,
-                                            expr->text, expr->text_len);
+    if (expr->call_is_resolved && expr->call_target_index < function_count) {
+      function_decl = &function_decls[expr->call_target_index];
+    } else {
+      function_decl = beet_find_function_decl(function_decls, function_count,
+                                              expr->text, expr->text_len);
+    }
     if (function_decl == NULL ||
         function_decl->param_count != expr->arg_count) {
       return type;
@@ -257,8 +268,11 @@ beet_type_check_expr(beet_ast_expr *expr, const beet_local_type *locals,
     size_t i;
     size_t j;
 
-    type_decl =
-        beet_find_type_decl(type_decls, decl_count, expr->text, expr->text_len);
+    type_decl = expr->resolved_type_decl;
+    if (type_decl == NULL) {
+      type_decl = beet_find_type_decl(type_decls, decl_count, expr->text,
+                                      expr->text_len);
+    }
     if (type_decl == NULL) {
       return type;
     }
@@ -276,9 +290,8 @@ beet_type_check_expr(beet_ast_expr *expr, const beet_local_type *locals,
         beet_type value_type;
 
         for (j = i + 1U; j < expr->field_init_count; ++j) {
-          if (beet_name_equals_slice(
-                  expr->field_inits[i].name, expr->field_inits[i].name_len,
-                  expr->field_inits[j].name, expr->field_inits[j].name_len)) {
+          if (beet_symbol_eq(expr->field_inits[i].name,
+                             expr->field_inits[j].name)) {
             return type;
           }
         }
@@ -318,8 +331,12 @@ beet_type_check_expr(beet_ast_expr *expr, const beet_local_type *locals,
         return type;
       }
 
-      variant_decl = beet_find_choice_variant(
-          type_decl, expr->field_inits[0].name, expr->field_inits[0].name_len);
+      variant_decl = expr->resolved_variant_decl;
+      if (variant_decl == NULL) {
+        variant_decl =
+            beet_find_choice_variant(type_decl, expr->field_inits[0].name,
+                                     expr->field_inits[0].name_len);
+      }
       if (variant_decl == NULL) {
         return type;
       }
@@ -374,14 +391,20 @@ beet_type_check_expr(beet_ast_expr *expr, const beet_local_type *locals,
       return type;
     }
 
-    type_decl = beet_find_type_decl(type_decls, decl_count, left_type.name,
-                                    left_type.name_len);
+    type_decl = expr->left->resolved_type_decl;
+    if (type_decl == NULL) {
+      type_decl = beet_find_type_decl(type_decls, decl_count, left_type.name,
+                                      left_type.name_len);
+    }
     if (type_decl == NULL || !type_decl->is_structure) {
       return type;
     }
 
-    field_decl =
-        beet_find_structure_field(type_decl, expr->text, expr->text_len);
+    field_decl = expr->resolved_field_decl;
+    if (field_decl == NULL) {
+      field_decl =
+          beet_find_structure_field(type_decl, expr->text, expr->text_len);
+    }
     if (field_decl == NULL) {
       return type;
     }
@@ -655,8 +678,12 @@ static int beet_type_check_stmt_list(
         return 0;
       }
 
-      type_decl = beet_find_type_decl(
-          type_decls, decl_count, scrutinee_type.name, scrutinee_type.name_len);
+      type_decl = stmt->match_expr.resolved_type_decl;
+      if (type_decl == NULL) {
+        type_decl =
+            beet_find_type_decl(type_decls, decl_count, scrutinee_type.name,
+                                scrutinee_type.name_len);
+      }
       if (type_decl == NULL || !type_decl->is_choice ||
           stmt->match_case_count == 0U) {
         return 0;
@@ -671,16 +698,18 @@ static int beet_type_check_stmt_list(
 
         for (duplicate_index = case_index + 1U;
              duplicate_index < stmt->match_case_count; ++duplicate_index) {
-          if (beet_name_equals_slice(
-                  match_case->variant_name, match_case->variant_name_len,
-                  stmt->match_cases[duplicate_index].variant_name,
-                  stmt->match_cases[duplicate_index].variant_name_len)) {
+          if (beet_symbol_eq(match_case->variant_name,
+                             stmt->match_cases[duplicate_index].variant_name)) {
             return 0;
           }
         }
 
-        variant_decl = beet_find_choice_variant(
-            type_decl, match_case->variant_name, match_case->variant_name_len);
+        variant_decl = match_case->resolved_variant_decl;
+        if (variant_decl == NULL) {
+          variant_decl =
+              beet_find_choice_variant(type_decl, match_case->variant_name,
+                                       match_case->variant_name_len);
+        }
         if (variant_decl == NULL) {
           return 0;
         }
@@ -859,14 +888,15 @@ static int beet_type_name_is_builtin(const char *name, size_t name_len) {
 
 static int beet_type_decl_has_param(const beet_ast_type_decl *type_decl,
                                     const char *name, size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(type_decl != NULL);
   assert(name != NULL);
 
+  id = beet_symbol_from_name_slice(name, name_len);
   for (i = 0U; i < type_decl->param_count; ++i) {
-    if (beet_name_equals_slice(type_decl->params[i].name,
-                               type_decl->params[i].name_len, name, name_len)) {
+    if (beet_symbol_eq(type_decl->params[i].name, id)) {
       return 1;
     }
   }
@@ -894,8 +924,7 @@ static int beet_type_decl_names_are_unique(const beet_ast_type_decl *type_decls,
 
   for (i = 0U; i < decl_count; ++i) {
     for (j = i + 1U; j < decl_count; ++j) {
-      if (beet_name_equals_slice(type_decls[i].name, type_decls[i].name_len,
-                                 type_decls[j].name, type_decls[j].name_len)) {
+      if (beet_symbol_eq(type_decls[i].name, type_decls[j].name)) {
         return 0;
       }
     }
@@ -913,9 +942,8 @@ beet_type_decl_params_are_unique(const beet_ast_type_decl *type_decl) {
 
   for (i = 0U; i < type_decl->param_count; ++i) {
     for (j = i + 1U; j < type_decl->param_count; ++j) {
-      if (beet_name_equals_slice(
-              type_decl->params[i].name, type_decl->params[i].name_len,
-              type_decl->params[j].name, type_decl->params[j].name_len)) {
+      if (beet_symbol_eq(type_decl->params[i].name,
+                         type_decl->params[j].name)) {
         return 0;
       }
     }
@@ -933,9 +961,8 @@ beet_structure_fields_are_unique(const beet_ast_type_decl *type_decl) {
 
   for (i = 0U; i < type_decl->field_count; ++i) {
     for (j = i + 1U; j < type_decl->field_count; ++j) {
-      if (beet_name_equals_slice(
-              type_decl->fields[i].name, type_decl->fields[i].name_len,
-              type_decl->fields[j].name, type_decl->fields[j].name_len)) {
+      if (beet_symbol_eq(type_decl->fields[i].name,
+                         type_decl->fields[j].name)) {
         return 0;
       }
     }
@@ -953,9 +980,8 @@ beet_choice_variants_are_unique(const beet_ast_type_decl *type_decl) {
 
   for (i = 0U; i < type_decl->variant_count; ++i) {
     for (j = i + 1U; j < type_decl->variant_count; ++j) {
-      if (beet_name_equals_slice(
-              type_decl->variants[i].name, type_decl->variants[i].name_len,
-              type_decl->variants[j].name, type_decl->variants[j].name_len)) {
+      if (beet_symbol_eq(type_decl->variants[i].name,
+                         type_decl->variants[j].name)) {
         return 0;
       }
     }

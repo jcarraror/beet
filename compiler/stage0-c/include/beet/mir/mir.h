@@ -5,6 +5,7 @@
 
 #include "beet/parser/ast.h"
 #include "beet/semantics/registry.h"
+#include "beet/support/intern.h"
 
 #define BEET_MIR_MAX_INSTRS 256
 #define BEET_MIR_MAX_LOCALS 128
@@ -52,6 +53,7 @@ typedef struct beet_mir_function {
   size_t instr_count;
 
   char (*locals)[BEET_MIR_MAX_NAME_LEN];
+  beet_symbol_id *local_ids;
   size_t local_count;
   size_t param_count;
 

@@ -1,14 +1,8 @@
 #include "beet/types/types.h"
 
 #include <assert.h>
-#include <string.h>
 
 #include "beet/support/intern.h"
-
-static int beet_name_equals(const char *name, size_t len,
-                            const char *expected) {
-  return beet_interned_slice_equals(name, len, expected, strlen(expected));
-}
 
 static beet_symbol_id beet_builtin_symbol(const char *name, size_t len) {
   beet_symbol_id symbol;
@@ -20,38 +14,50 @@ static beet_symbol_id beet_builtin_symbol(const char *name, size_t len) {
 
 beet_type beet_type_from_name_slice(const char *name, size_t len) {
   beet_type type;
+  beet_symbol_id symbol;
+  beet_symbol_id int_symbol;
+  beet_symbol_id float_symbol;
+  beet_symbol_id bool_symbol;
+  beet_symbol_id unit_symbol;
 
   assert(name != NULL);
 
+  symbol = beet_intern_slice(name, len);
+  assert(symbol != NULL);
+
   type.kind = BEET_TYPE_NAMED;
-  type.name = beet_intern_slice(name, len);
-  assert(type.name != NULL);
+  type.name = symbol;
   type.name_len = len;
 
-  if (beet_name_equals(name, len, "Int")) {
+  int_symbol = beet_builtin_symbol("Int", 3U);
+  float_symbol = beet_builtin_symbol("Float", 5U);
+  bool_symbol = beet_builtin_symbol("Bool", 4U);
+  unit_symbol = beet_builtin_symbol("Unit", 4U);
+
+  if (beet_symbol_eq(symbol, int_symbol)) {
     type.kind = BEET_TYPE_INT;
-    type.name = beet_builtin_symbol("Int", 3U);
+    type.name = int_symbol;
     type.name_len = 3U;
     return type;
   }
 
-  if (beet_name_equals(name, len, "Float")) {
+  if (beet_symbol_eq(symbol, float_symbol)) {
     type.kind = BEET_TYPE_FLOAT;
-    type.name = beet_builtin_symbol("Float", 5U);
+    type.name = float_symbol;
     type.name_len = 5U;
     return type;
   }
 
-  if (beet_name_equals(name, len, "Bool")) {
+  if (beet_symbol_eq(symbol, bool_symbol)) {
     type.kind = BEET_TYPE_BOOL;
-    type.name = beet_builtin_symbol("Bool", 4U);
+    type.name = bool_symbol;
     type.name_len = 4U;
     return type;
   }
 
-  if (beet_name_equals(name, len, "Unit")) {
+  if (beet_symbol_eq(symbol, unit_symbol)) {
     type.kind = BEET_TYPE_UNIT;
-    type.name = beet_builtin_symbol("Unit", 4U);
+    type.name = unit_symbol;
     type.name_len = 4U;
     return type;
   }

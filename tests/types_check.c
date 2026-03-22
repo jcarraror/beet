@@ -7,6 +7,19 @@
 #include "beet/types/check.h"
 #include "beet/types/types.h"
 
+static void test_builtin_type_symbols_are_canonical(void) {
+  char dynamic_name[] = {'I', 'n', 't'};
+  beet_type left;
+  beet_type right;
+
+  left = beet_type_from_name_slice("Int", 3U);
+  right = beet_type_from_name_slice(dynamic_name, 3U);
+
+  assert(left.kind == BEET_TYPE_INT);
+  assert(right.kind == BEET_TYPE_INT);
+  assert(left.name == right.name);
+}
+
 static void test_infer_int_binding(void) {
   const char *text = "bind x = 10\n";
   beet_source_file file;
@@ -1279,6 +1292,7 @@ static void test_match_statement_rejects_duplicate_variants(void) {
 }
 
 int main(void) {
+  test_builtin_type_symbols_are_canonical();
   test_infer_int_binding();
   test_infer_bool_binding();
   test_typed_binding_ok();

@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "beet/support/intern.h"
+
 typedef struct beet_mir_allocation {
   void *ptr;
   struct beet_mir_allocation *next;
@@ -98,12 +100,19 @@ static int beet_parse_int_slice(const char *text, size_t len, int *out_value) {
   return 1;
 }
 
-static int beet_name_equals_slice(const char *left, size_t left_len,
-                                  const char *right, size_t right_len) {
-  return left_len == right_len && strncmp(left, right, left_len) == 0;
+static beet_symbol_id beet_mir_symbol_from_name(const char *name,
+                                                size_t name_len) {
+  beet_symbol_id id;
+
+  assert(name != NULL);
+
+  id = beet_intern_slice(name, name_len);
+  assert(id != NULL);
+  return id;
 }
 
 typedef struct beet_mir_local_type {
+  beet_symbol_id id;
   const char *name;
   size_t name_len;
   const char *type_name;
@@ -146,6 +155,7 @@ beet_mir_context_bind_local_type(beet_mir_lower_context *ctx, const char *name,
     return 0;
   }
 
+  ctx->locals[ctx->local_count].id = beet_mir_symbol_from_name(name, name_len);
   ctx->locals[ctx->local_count].name = name;
   ctx->locals[ctx->local_count].name_len = name_len;
   ctx->locals[ctx->local_count].type_name = type_name;
@@ -157,14 +167,16 @@ beet_mir_context_bind_local_type(beet_mir_lower_context *ctx, const char *name,
 
 static int beet_mir_function_has_local(const beet_mir_function *function,
                                        const char *name, size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(function != NULL);
   assert(name != NULL);
 
+  id = beet_mir_symbol_from_name(name, name_len);
+
   for (i = 0U; i < function->local_count; ++i) {
-    if (strncmp(function->locals[i], name, name_len) == 0 &&
-        function->locals[i][name_len] == '\0') {
+    if (beet_symbol_eq(function->local_ids[i], id)) {
       return 1;
     }
   }
@@ -174,9 +186,12 @@ static int beet_mir_function_has_local(const beet_mir_function *function,
 
 static int beet_mir_reserve_local(beet_mir_function *function, const char *name,
                                   size_t name_len) {
+  beet_symbol_id id;
+
   assert(function != NULL);
   assert(name != NULL);
 
+  id = beet_mir_symbol_from_name(name, name_len);
   if (beet_mir_function_has_local(function, name, name_len)) {
     return 1;
   }
@@ -185,6 +200,7 @@ static int beet_mir_reserve_local(beet_mir_function *function, const char *name,
     return 0;
   }
 
+  function->local_ids[function->local_count] = id;
   beet_copy_name(function->locals[function->local_count], name, name_len);
   function->local_count += 1U;
   return 1;
@@ -193,16 +209,17 @@ static int beet_mir_reserve_local(beet_mir_function *function, const char *name,
 static const beet_mir_local_type *
 beet_mir_context_find_local_type(const beet_mir_lower_context *ctx,
                                  const char *name, size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(ctx != NULL);
   assert(name != NULL);
 
+  id = beet_mir_symbol_from_name(name, name_len);
   i = ctx->local_count;
   while (i > 0U) {
     i -= 1U;
-    if (beet_name_equals_slice(ctx->locals[i].name, ctx->locals[i].name_len,
-                               name, name_len)) {
+    if (beet_symbol_eq(ctx->locals[i].id, id)) {
       return &ctx->locals[i];
     }
   }
@@ -213,6 +230,7 @@ beet_mir_context_find_local_type(const beet_mir_lower_context *ctx,
 static const beet_ast_expr *
 beet_mir_find_construct_field_value(const beet_ast_expr *construct,
                                     const char *name, size_t name_len) {
+  beet_symbol_id id;
   size_t i;
 
   assert(construct != NULL);
@@ -222,14 +240,13 @@ beet_mir_find_construct_field_value(const beet_ast_expr *construct,
     return NULL;
   }
 
+  id = beet_mir_symbol_from_name(name, name_len);
   for (i = 0U; i < construct->field_init_count; ++i) {
     if (construct->field_inits[i].value == NULL) {
       continue;
     }
 
-    if (beet_name_equals_slice(construct->field_inits[i].name,
-                               construct->field_inits[i].name_len, name,
-                               name_len)) {
+    if (beet_symbol_eq(construct->field_inits[i].name, id)) {
       return construct->field_inits[i].value;
     }
   }
@@ -343,8 +360,11 @@ void beet_mir_function_init(beet_mir_function *function, const char *name,
       beet_mir_alloc_zeroed(sizeof(beet_mir_instr) * BEET_MIR_MAX_INSTRS);
   function->locals =
       beet_mir_alloc_zeroed(sizeof(*function->locals) * BEET_MIR_MAX_LOCALS);
+  function->local_ids =
+      beet_mir_alloc_zeroed(sizeof(*function->local_ids) * BEET_MIR_MAX_LOCALS);
   assert(function->instrs != NULL);
   assert(function->locals != NULL);
+  assert(function->local_ids != NULL);
 
   beet_copy_name(function->name, name, name_len);
   function->instr_count = 0U;
@@ -1037,11 +1057,11 @@ static int beet_mir_lower_expr(beet_mir_lower_context *ctx,
     return *out_temp >= 0;
 
   case BEET_AST_EXPR_BOOL_LITERAL:
-    if (expr->text_len == 4U) {
+    if (beet_symbol_eq(expr->text, beet_intern_slice("true", 4U))) {
       *out_temp = beet_mir_add_const_int(ctx->function, 1);
       return *out_temp >= 0;
     }
-    if (expr->text_len == 5U) {
+    if (beet_symbol_eq(expr->text, beet_intern_slice("false", 5U))) {
       *out_temp = beet_mir_add_const_int(ctx->function, 0);
       return *out_temp >= 0;
     }
@@ -1223,7 +1243,7 @@ static int beet_mir_get_match_scrutinee(beet_mir_lower_context *ctx,
   }
 
   beet_copy_name(out->local_name, expr->text, expr->text_len);
-  out->local_name_len = strlen(out->local_name);
+  out->local_name_len = expr->text_len;
   return 1;
 }
 
@@ -1244,10 +1264,10 @@ static int beet_mir_lower_return_stmt(beet_mir_lower_context *ctx,
     return beet_mir_add_return_const_int(ctx->function, value);
 
   case BEET_AST_EXPR_BOOL_LITERAL:
-    if (stmt->expr.text_len == 4U) {
+    if (beet_symbol_eq(stmt->expr.text, beet_intern_slice("true", 4U))) {
       return beet_mir_add_return_const_int(ctx->function, 1);
     }
-    if (stmt->expr.text_len == 5U) {
+    if (beet_symbol_eq(stmt->expr.text, beet_intern_slice("false", 5U))) {
       return beet_mir_add_return_const_int(ctx->function, 0);
     }
     return 0;

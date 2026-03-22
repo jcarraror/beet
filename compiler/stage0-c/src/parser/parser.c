@@ -80,6 +80,21 @@ static beet_source_span beet_parser_span_from_bounds(beet_source_span start,
   return span;
 }
 
+static int beet_parser_symbol_is_bool_literal(beet_symbol_id symbol) {
+  beet_symbol_id true_symbol;
+  beet_symbol_id false_symbol;
+
+  assert(symbol != NULL);
+
+  true_symbol = beet_intern_slice("true", 4U);
+  false_symbol = beet_intern_slice("false", 5U);
+  assert(true_symbol != NULL);
+  assert(false_symbol != NULL);
+
+  return beet_symbol_eq(symbol, true_symbol) ||
+         beet_symbol_eq(symbol, false_symbol);
+}
+
 static void beet_parser_advance(beet_parser *parser) {
   parser->current = beet_lexer_next(&parser->lexer);
 }
@@ -513,6 +528,7 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
                                           beet_ast_expr_pool *pool,
                                           beet_ast_expr *out) {
   beet_token identifier_token;
+  beet_symbol_id identifier_symbol;
 
   assert(parser != NULL);
   assert(pool != NULL);
@@ -535,10 +551,13 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
     identifier_token = parser->current;
     beet_parser_advance(parser);
 
-    is_bool_name = (identifier_token.lexeme_len == 4U &&
-                    strncmp(identifier_token.lexeme, "true", 4U) == 0) ||
-                   (identifier_token.lexeme_len == 5U &&
-                    strncmp(identifier_token.lexeme, "false", 5U) == 0);
+    identifier_symbol =
+        beet_intern_slice(identifier_token.lexeme, identifier_token.lexeme_len);
+    if (identifier_symbol == NULL) {
+      return 0;
+    }
+
+    is_bool_name = beet_parser_symbol_is_bool_literal(identifier_symbol);
 
     if (!is_bool_name && parser->current.kind == BEET_TOKEN_LPAREN) {
       if (beet_parser_paren_starts_construct(parser)) {
@@ -549,16 +568,11 @@ static int beet_parser_parse_primary_expr(beet_parser *parser,
       return beet_parser_parse_call_expr(parser, pool, &identifier_token, out);
     }
 
-    out->text =
-        beet_intern_slice(identifier_token.lexeme, identifier_token.lexeme_len);
-    if (out->text == NULL) {
-      return 0;
-    }
+    out->text = identifier_symbol;
     out->text_len = identifier_token.lexeme_len;
     out->span = identifier_token.span;
 
-    if ((out->text_len == 4U && strncmp(out->text, "true", 4U) == 0) ||
-        (out->text_len == 5U && strncmp(out->text, "false", 5U) == 0)) {
+    if (is_bool_name) {
       out->kind = BEET_AST_EXPR_BOOL_LITERAL;
     } else {
       out->kind = BEET_AST_EXPR_NAME;
